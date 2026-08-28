@@ -50,6 +50,8 @@ bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 db_pool = None
 VIDEO_CODE_RE = re.compile(r"(?:start=)?(video_[A-Za-z0-9_-]+)")
+ADMIN_CACHE = {OWNER_ID}
+ADMIN_PERMS = {}
 
 
 def utcnow_sql():
@@ -63,6 +65,7 @@ async def init_db():
     if os.path.exists(schema_path):
         async with db_pool.acquire() as conn:
             await conn.execute(open(schema_path, "r", encoding="utf-8").read())
+    await refresh_admin_cache()
     log.info("PostgreSQL connected and schema ready")
 
 
@@ -96,11 +99,46 @@ async def db_execute(sql, args=()):
             return 0
 
 
+async def refresh_admin_cache():
+    global ADMIN_CACHE, ADMIN_PERMS
+    ADMIN_CACHE = {OWNER_ID}
+    ADMIN_PERMS = {OWNER_ID: {"role":"owner","can_manage_content":True,"can_manage_settings":True,"can_broadcast":True,"can_manage_users":True,"can_manage_admins":True}}
+    try:
+        rows = await db_fetchall("SELECT * FROM admin_users")
+        for r in rows:
+            uid = int(r["user_id"])
+            ADMIN_CACHE.add(uid)
+            ADMIN_PERMS[uid] = dict(r)
+    except Exception:
+        log.exception("admin cache refresh failed")
+
+
+def is_admin_id(user_id):
+    try: return int(user_id) in ADMIN_CACHE
+    except Exception: return False
+
+
+def has_perm(user_id, perm):
+    uid = int(user_id)
+    if uid == OWNER_ID: return True
+    p = ADMIN_PERMS.get(uid) or {}
+    return bool(p.get(perm, False))
+
+
+async def current_storage_channel_id():
+    try:
+        st = await get_settings()
+        val = st.get("storage_channel_id")
+        return int(val) if val else STORAGE_CHANNEL_ID
+    except Exception:
+        return STORAGE_CHANNEL_ID
+
+
 async def get_settings():
     try:
         row = await db_fetchone("SELECT * FROM app_settings WHERE id='main' LIMIT 1")
         if row:
-            for key in ("protect_content", "maintenance_mode", "show_online"):
+            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled"):
                 if key in row:
                     row[key] = bool(row[key])
             return row
@@ -120,6 +158,10 @@ async def get_settings():
         "tutorial_video_code": None,
         "tutorial_caption": "🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।",
         "tutorial_button_text": "🎬 ভিডিও দেখতে শুরু করুন",
+        "storage_channel_id": STORAGE_CHANNEL_ID,
+        "maintenance_message": "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।",
+        "support_url": None, "join_channel_url": None, "start_button_text": "🎬 ভিডিও দেখতে শুরু করুন",
+        "comments_enabled": True, "reactions_enabled": True, "favorites_enabled": True, "profile_stats_enabled": True,
     }
 
 
@@ -156,7 +198,7 @@ async def lookup_video(code: str):
         msg_id = int(m.group(1))
         if msg_id <= 0:
             return None
-        return {"video_code": code, "channel_id": STORAGE_CHANNEL_ID, "message_id": msg_id, "recovered": True}
+        return {"video_code": code, "channel_id": await current_storage_channel_id(), "message_id": msg_id, "recovered": True}
     except Exception:
         log.exception("video lookup failed")
         return None
@@ -204,8 +246,8 @@ async def delete_later(chat_id: int, message_id: int, minutes: int):
 
 async def deliver_video(message: Message, code: str):
     settings = await get_settings()
-    if settings.get("maintenance_mode") and message.from_user.id != OWNER_ID:
-        await message.answer("⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
+    if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
+        await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
         return
 
     rec = await lookup_video(code)
@@ -290,6 +332,9 @@ async def start_handler(message: Message):
         return
 
     settings = await get_settings()
+    if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
+        await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
+        return
     tutorial_sent = await send_start_tutorial(message, settings)
     if tutorial_sent:
         return
@@ -308,7 +353,7 @@ async def private_text_handler(message: Message):
     if m:
         await deliver_video(message, m.group(1))
         return
-    if message.from_user and message.from_user.id == OWNER_ID and text == "/adminhelp":
+    if message.from_user and is_admin_id(message.from_user.id) and text == "/adminhelp":
         await message.answer(
             "Storage Channel-এ video upload করুন → Bot deep link তৈরি করে Owner inbox-এ পাঠাবে।\n"
             "Mini App URL ও Menu Button নাম Admin Settings থেকে পরিবর্তন করা যায়।"
@@ -317,7 +362,7 @@ async def private_text_handler(message: Message):
 
 @dp.channel_post()
 async def storage_channel_post(message: Message):
-    if message.chat.id != STORAGE_CHANNEL_ID:
+    if message.chat.id != await current_storage_channel_id():
         return
     if not (message.video or message.document or message.animation):
         return
@@ -342,7 +387,7 @@ async def storage_channel_post(message: Message):
     caption = message.caption or ""
     await bot.send_message(
         OWNER_ID,
-        f"✅ নতুন ভিডিও detect হয়েছে\n\nVideo Code: <code>{code}</code>\nOriginal Bot Link:\n<code>{deep_link}</code>\n\n"
+        f"✅ নতুন ভিডিও detect হয়েছে\n\nStorage Channel: <code>{message.chat.id}</code>\nVideo Code: <code>{code}</code>\nOriginal Bot Link:\n<code>{deep_link}</code>\n\n"
         "এখন এই link short করে Mini App Admin Panel-এ Title + Thumbnail + Short Link দিয়ে Publish করুন।\n\n"
         f"Channel caption: {caption[:500]}",
         parse_mode=ParseMode.HTML,
@@ -352,8 +397,8 @@ async def storage_channel_post(message: Message):
 
 @dp.callback_query(F.data.startswith("set_tutorial:"))
 async def set_tutorial_callback(query: CallbackQuery):
-    if not query.from_user or query.from_user.id != OWNER_ID:
-        await query.answer("Admin only", show_alert=True)
+    if not query.from_user or not is_admin_id(query.from_user.id) or not has_perm(query.from_user.id, "can_manage_settings"):
+        await query.answer("Admin permission required", show_alert=True)
         return
     code = (query.data or "").split(":", 1)[1].strip()
     rec = await lookup_video(code)
@@ -439,10 +484,12 @@ def request_user(request):
     return verify_init_data(request.headers.get("X-Telegram-Init-Data", ""))
 
 
-def require_admin(request):
+def require_admin(request, perm=None):
     u = request_user(request)
-    if not u or int(u.get("id", 0)) != OWNER_ID:
+    if not u or not is_admin_id(int(u.get("id", 0))):
         raise web.HTTPForbidden(text="Admin authorization required")
+    if perm and not has_perm(int(u.get("id", 0)), perm):
+        raise web.HTTPForbidden(text="Admin permission denied")
     return u
 
 
@@ -463,7 +510,7 @@ async def health_handler(request):
 
 async def api_bootstrap(request):
     u = request_user(request)
-    is_admin = bool(u and int(u.get("id", 0)) == OWNER_ID)
+    is_admin = bool(u and is_admin_id(int(u.get("id", 0))))
     if is_admin:
         videos = await db_fetchall("SELECT * FROM videos WHERE published=TRUE ORDER BY created_at DESC")
     else:
@@ -491,7 +538,7 @@ async def api_bootstrap(request):
     safe_settings = dict(settings)
     # Credentials never exist in this table, but keep response explicitly UI-only.
     stats = None
-    if u and int(u.get("id", 0)) == OWNER_ID:
+    if u and is_admin_id(int(u.get("id", 0))):
         total_users = (await db_fetchone("SELECT COUNT(*) c FROM bot_users"))["c"]
         requests = (await db_fetchone("SELECT COUNT(*) c FROM video_requests"))["c"]
         unlocks=(await db_fetchone("SELECT COUNT(*) c FROM video_requests WHERE delivered=TRUE"))["c"]
@@ -509,6 +556,8 @@ async def api_bootstrap(request):
         "is_admin": is_admin,
         "stats": stats,
         "bot_username": BOT_USERNAME if is_admin else None,
+        "is_owner": bool(u and int(u.get("id",0)) == OWNER_ID),
+        "admin_permissions": ADMIN_PERMS.get(int(u.get("id",0)), {}) if u and is_admin else {},
     }
     return web.Response(text=json.dumps(payload, default=str, ensure_ascii=False), content_type="application/json")
 
@@ -525,7 +574,7 @@ async def api_presence(request):
     online = (await db_fetchone("SELECT COUNT(*) c FROM miniapp_presence WHERE last_seen_at >= CURRENT_TIMESTAMP - INTERVAL '75 seconds'"))["c"]
     today = (await db_fetchone("SELECT COUNT(*) c FROM miniapp_presence WHERE last_seen_at >= CURRENT_DATE"))["c"]
     payload = {"online": online, "today_active": today}
-    if u and int(u.get("id", 0)) == OWNER_ID:
+    if u and is_admin_id(int(u.get("id", 0))):
         payload["total_users"] = (await db_fetchone("SELECT COUNT(*) c FROM bot_users"))["c"]
         payload["video_requests"] = (await db_fetchone("SELECT COUNT(*) c FROM video_requests"))["c"]
     return web.json_response(payload)
@@ -565,6 +614,9 @@ async def api_profile(request):
     if not u:
         raise web.HTTPUnauthorized(text="Telegram authorization required")
     uid = int(u["id"])
+    settings = await get_settings()
+    if settings.get("profile_stats_enabled") is False:
+        return web.json_response({"opened_total":0,"opened_unique":0,"unlocked":0,"favorites":0,"reactions":0,"comments":0,"recent_unlocked":[]})
     opened = await db_fetchone("SELECT COALESCE(SUM(open_count),0) c, COUNT(*) unique_c FROM video_views WHERE user_id=%s", (uid,))
     unlocked = await db_fetchone("SELECT COUNT(DISTINCT video_code) c FROM video_requests WHERE user_id=%s AND delivered=TRUE", (uid,))
     favs = await db_fetchone("SELECT COUNT(*) c FROM favorites WHERE user_id=%s", (uid,))
@@ -583,6 +635,7 @@ async def api_profile(request):
 
 
 async def api_toggle_favorite(request):
+    if (await get_settings()).get("favorites_enabled") is False: raise web.HTTPForbidden(text="Favorites disabled")
     u = request_user(request)
     if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
     uid, vid = int(u["id"]), request.match_info["video_id"]
@@ -596,6 +649,7 @@ async def api_toggle_favorite(request):
 
 
 async def api_toggle_reaction(request):
+    if (await get_settings()).get("reactions_enabled") is False: raise web.HTTPForbidden(text="Reactions disabled")
     u = request_user(request)
     if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
     uid, vid = int(u["id"]), request.match_info["video_id"]
@@ -609,6 +663,9 @@ async def api_toggle_reaction(request):
 
 
 async def api_comments(request):
+    if (await get_settings()).get("comments_enabled") is False:
+        if request.method == 'GET': return web.json_response({"comments":[]})
+        raise web.HTTPForbidden(text="Comments disabled")
     vid = request.match_info["video_id"]
     if request.method == 'GET':
         rows=await db_fetchall("SELECT id,display_name,username,text,created_at FROM comments WHERE video_id=%s ORDER BY created_at DESC LIMIT 100",(vid,))
@@ -643,7 +700,7 @@ async def api_unlock_click(request):
 
 
 async def api_admin_video_save(request):
-    require_admin(request)
+    require_admin(request, "can_manage_content")
     d = await json_body(request)
     required = ["id", "video_code", "title", "short_url"]
     if any(not str(d.get(k, "")).strip() for k in required):
@@ -663,13 +720,13 @@ async def api_admin_video_save(request):
 
 
 async def api_admin_video_delete(request):
-    require_admin(request)
+    require_admin(request, "can_manage_content")
     await db_execute("DELETE FROM videos WHERE id=%s", (request.match_info["video_id"],))
     return web.json_response({"ok": True})
 
 
 async def api_admin_category_save(request):
-    require_admin(request)
+    require_admin(request, "can_manage_content")
     d = await json_body(request)
     await db_execute(
         "INSERT INTO categories(id,name,icon,sort_order) VALUES(%s,%s,%s,%s) ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name,icon=EXCLUDED.icon,sort_order=EXCLUDED.sort_order",
@@ -679,7 +736,7 @@ async def api_admin_category_save(request):
 
 
 async def api_admin_viral_save(request):
-    require_admin(request)
+    require_admin(request, "can_manage_content")
     d = await json_body(request)
     await db_execute(
         "INSERT INTO viral_links(id,title,url,created_at) VALUES(%s,%s,%s,%s) ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title,url=EXCLUDED.url",
@@ -689,22 +746,24 @@ async def api_admin_viral_save(request):
 
 
 async def api_admin_viral_delete(request):
-    require_admin(request)
+    require_admin(request, "can_manage_content")
     await db_execute("DELETE FROM viral_links WHERE id=%s", (request.match_info["link_id"],))
     return web.json_response({"ok": True})
 
 
 async def api_admin_settings_save(request):
-    require_admin(request)
+    require_admin(request, "can_manage_settings")
     d = await json_body(request)
     fields = [
         "brand_name", "brand_subtitle", "hero_text", "nav_home", "nav_fav", "nav_unlock", "nav_viral", "nav_profile",
         "online_label", "show_online", "web_app_url", "bot_menu_button_text", "welcome_text", "watch_button_text",
         "broadcast_button_text", "auto_delete_minutes", "protect_content", "maintenance_mode",
-        "tutorial_enabled", "tutorial_video_code", "tutorial_caption", "tutorial_button_text"
+        "tutorial_enabled", "tutorial_video_code", "tutorial_caption", "tutorial_button_text",
+        "storage_channel_id", "maintenance_message", "support_url", "join_channel_url", "start_button_text",
+        "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled"
     ]
     vals = [d.get(f) for f in fields]
-    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled"}
+    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled"}
     vals = [bool(v) if fields[i] in bool_fields else v for i, v in enumerate(vals)]
     placeholders = ",".join(["%s"] * (len(fields) + 1))
     updates = ",".join([f"{f}=EXCLUDED.{f}" for f in fields])
@@ -714,6 +773,63 @@ async def api_admin_settings_save(request):
     )
     await sync_menu_button()
     return web.json_response({"ok": True})
+
+
+async def api_admin_admins(request):
+    u = require_admin(request, "can_manage_admins")
+    if request.method == "GET":
+        rows = await db_fetchall("SELECT user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins,created_at FROM admin_users ORDER BY created_at")
+        return web.Response(text=json.dumps({"owner_id": OWNER_ID, "admins": rows}, default=str, ensure_ascii=False), content_type="application/json")
+    d = await json_body(request)
+    uid = int(d.get("user_id", 0))
+    if uid <= 0 or uid == OWNER_ID: raise web.HTTPBadRequest(text="Invalid admin user id")
+    vals = (uid, str(d.get("role") or "admin"), str(d.get("display_name") or "Admin")[:255], bool(d.get("can_manage_content",True)), bool(d.get("can_manage_settings",True)), bool(d.get("can_broadcast",True)), bool(d.get("can_manage_users",True)), bool(d.get("can_manage_admins",False)))
+    await db_execute("""INSERT INTO admin_users(user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins)
+      VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(user_id) DO UPDATE SET role=EXCLUDED.role,display_name=EXCLUDED.display_name,can_manage_content=EXCLUDED.can_manage_content,can_manage_settings=EXCLUDED.can_manage_settings,can_broadcast=EXCLUDED.can_broadcast,can_manage_users=EXCLUDED.can_manage_users,can_manage_admins=EXCLUDED.can_manage_admins""", vals)
+    await refresh_admin_cache()
+    return web.json_response({"ok":True})
+
+
+async def api_admin_admin_delete(request):
+    require_admin(request, "can_manage_admins")
+    uid = int(request.match_info["user_id"])
+    if uid == OWNER_ID: raise web.HTTPBadRequest(text="Owner cannot be removed")
+    await db_execute("DELETE FROM admin_users WHERE user_id=%s", (uid,))
+    await refresh_admin_cache()
+    return web.json_response({"ok":True})
+
+
+async def api_admin_users(request):
+    require_admin(request, "can_manage_users")
+    rows = await db_fetchall("SELECT user_id,username,first_name,last_name,is_active,last_seen_at,created_at FROM bot_users ORDER BY last_seen_at DESC LIMIT 500")
+    return web.Response(text=json.dumps({"users":rows}, default=str, ensure_ascii=False), content_type="application/json")
+
+
+async def api_admin_user_toggle(request):
+    require_admin(request, "can_manage_users")
+    uid=int(request.match_info["user_id"]); d=await json_body(request); active=bool(d.get("is_active",True))
+    await db_execute("UPDATE bot_users SET is_active=%s WHERE user_id=%s", (active,uid))
+    return web.json_response({"ok":True})
+
+
+async def api_admin_broadcast(request):
+    u=require_admin(request, "can_broadcast"); d=await json_body(request)
+    typ=str(d.get("message_type") or "text"); text=str(d.get("text") or "").strip(); media=str(d.get("media_url") or "").strip(); bt=str(d.get("button_text") or "").strip(); bu=str(d.get("button_url") or "").strip()
+    if not text and not media: raise web.HTTPBadRequest(text="Message or media required")
+    users=await db_fetchall("SELECT user_id FROM bot_users WHERE is_active=TRUE")
+    kb=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=bt,url=bu)]]) if bt and bu else None
+    ok=fail=0
+    for row in users:
+        uid=int(row["user_id"])
+        try:
+            if typ=="photo" and media: await bot.send_photo(uid,photo=media,caption=text or None,reply_markup=kb,protect_content=True)
+            elif typ=="video" and media: await bot.send_video(uid,video=media,caption=text or None,reply_markup=kb,protect_content=True)
+            else: await bot.send_message(uid,text,reply_markup=kb,protect_content=True)
+            ok+=1; await asyncio.sleep(0.05)
+        except Exception:
+            fail+=1
+    await db_execute("INSERT INTO admin_broadcasts(created_by,message_type,text_content,media_url,button_text,button_url,sent_count,failed_count) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(int(u["id"]),typ,text,media,bt,bu,ok,fail))
+    return web.json_response({"ok":True,"sent":ok,"failed":fail})
 
 
 async def menu_sync_worker():
@@ -751,6 +867,12 @@ async def start_web_server():
     app.router.add_post("/api/admin/viral-links", api_admin_viral_save)
     app.router.add_delete("/api/admin/viral-links/{link_id}", api_admin_viral_delete)
     app.router.add_post("/api/admin/settings", api_admin_settings_save)
+    app.router.add_get("/api/admin/admins", api_admin_admins)
+    app.router.add_post("/api/admin/admins", api_admin_admins)
+    app.router.add_delete("/api/admin/admins/{user_id}", api_admin_admin_delete)
+    app.router.add_get("/api/admin/users", api_admin_users)
+    app.router.add_post("/api/admin/users/{user_id}/toggle", api_admin_user_toggle)
+    app.router.add_post("/api/admin/broadcast", api_admin_broadcast)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
