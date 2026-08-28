@@ -18,6 +18,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import (
     BotCommand,
     BufferedInputFile,
+    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
@@ -115,6 +116,10 @@ async def get_settings():
         "bot_menu_button_text": DEFAULT_MENU_BUTTON_TEXT,
         "welcome_text": "👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।",
         "show_online": True,
+        "tutorial_enabled": True,
+        "tutorial_video_code": None,
+        "tutorial_caption": "🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।",
+        "tutorial_button_text": "🎬 ভিডিও দেখতে শুরু করুন",
     }
 
 
@@ -238,6 +243,43 @@ async def deliver_video(message: Message, code: str):
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Storage Channel permission চেক করুন।")
 
 
+async def send_start_tutorial(message: Message, settings):
+    """Send the admin-selected tutorial video on normal /start.
+
+    The tutorial video is stored in the same private storage channel and selected
+    by its video_code (for example video_145).
+    """
+    if not settings.get("tutorial_enabled", True):
+        return False
+    code = (settings.get("tutorial_video_code") or "").strip()
+    if not code:
+        return False
+    rec = await lookup_video(code)
+    if not rec:
+        log.warning("tutorial video mapping missing: %s", code)
+        return False
+    kb = await webapp_keyboard(settings)
+    if kb:
+        # Use tutorial-specific button label while keeping the configured web app URL.
+        url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
+        label = (settings.get("tutorial_button_text") or "🎬 ভিডিও দেখতে শুরু করুন").strip()[:64]
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))]])
+    caption = settings.get("tutorial_caption") or "🎓 ভিডিও কীভাবে দেখবেন"
+    try:
+        await bot.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=int(rec["channel_id"]),
+            message_id=int(rec["message_id"]),
+            caption=caption,
+            reply_markup=kb,
+            protect_content=True,
+        )
+        return True
+    except Exception:
+        log.exception("tutorial send failed")
+        return False
+
+
 @dp.message(CommandStart())
 async def start_handler(message: Message):
     await save_user(message)
@@ -248,6 +290,9 @@ async def start_handler(message: Message):
         return
 
     settings = await get_settings()
+    tutorial_sent = await send_start_tutorial(message, settings)
+    if tutorial_sent:
+        return
     welcome = settings.get("welcome_text") or (
         f"👋 স্বাগতম {settings.get('brand_name','Bangladesh Viral Video')} Bot-এ।\n\n"
         "নিচের বাটন থেকে Mini App খুলুন এবং আপনার পছন্দের ভিডিও দেখুন।"
@@ -290,7 +335,10 @@ async def storage_channel_post(message: Message):
         return
 
     deep_link = f"https://t.me/{BOT_USERNAME}?start={code}"
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔗 Deep Link খুলুন", url=deep_link)]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔗 Deep Link খুলুন", url=deep_link)],
+        [InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")],
+    ])
     caption = message.caption or ""
     await bot.send_message(
         OWNER_ID,
@@ -300,6 +348,28 @@ async def storage_channel_post(message: Message):
         parse_mode=ParseMode.HTML,
         reply_markup=kb,
     )
+
+
+@dp.callback_query(F.data.startswith("set_tutorial:"))
+async def set_tutorial_callback(query: CallbackQuery):
+    if not query.from_user or query.from_user.id != OWNER_ID:
+        await query.answer("Admin only", show_alert=True)
+        return
+    code = (query.data or "").split(":", 1)[1].strip()
+    rec = await lookup_video(code)
+    if not rec:
+        await query.answer("ভিডিও mapping পাওয়া যায়নি", show_alert=True)
+        return
+    await db_execute(
+        "UPDATE app_settings SET tutorial_video_code=%s, tutorial_enabled=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id='main'",
+        (code,),
+    )
+    await query.answer("Tutorial video সেট হয়েছে ✅", show_alert=True)
+    try:
+        await query.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await bot.send_message(OWNER_ID, f"✅ <code>{code}</code> এখন /start Tutorial Video হিসেবে সেট করা হয়েছে।", parse_mode=ParseMode.HTML)
 
 
 async def broadcast_worker():
@@ -630,10 +700,11 @@ async def api_admin_settings_save(request):
     fields = [
         "brand_name", "brand_subtitle", "hero_text", "nav_home", "nav_fav", "nav_unlock", "nav_viral", "nav_profile",
         "online_label", "show_online", "web_app_url", "bot_menu_button_text", "welcome_text", "watch_button_text",
-        "broadcast_button_text", "auto_delete_minutes", "protect_content", "maintenance_mode"
+        "broadcast_button_text", "auto_delete_minutes", "protect_content", "maintenance_mode",
+        "tutorial_enabled", "tutorial_video_code", "tutorial_caption", "tutorial_button_text"
     ]
     vals = [d.get(f) for f in fields]
-    bool_fields = {"show_online", "protect_content", "maintenance_mode"}
+    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled"}
     vals = [bool(v) if fields[i] in bool_fields else v for i, v in enumerate(vals)]
     placeholders = ",".join(["%s"] * (len(fields) + 1))
     updates = ",".join([f"{f}=EXCLUDED.{f}" for f in fields])
