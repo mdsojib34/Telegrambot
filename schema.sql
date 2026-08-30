@@ -249,3 +249,44 @@ CREATE INDEX IF NOT EXISTS idx_upload_drafts_pending ON upload_drafts(consumed, 
 -- V16 smart auto thumbnail + multi-admin notification metadata
 ALTER TABLE upload_drafts ADD COLUMN IF NOT EXISTS uploader_label VARCHAR(255) DEFAULT 'Channel Upload';
 CREATE INDEX IF NOT EXISTS idx_upload_drafts_uploader ON upload_drafts(uploader_label);
+
+-- =========================================================
+-- V17 Join/Leave Welcome Manager
+-- =========================================================
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_manager_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS join_request_welcome_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS direct_join_welcome_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS leave_inbox_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS auto_approve_join_requests BOOLEAN DEFAULT FALSE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS join_welcome_text TEXT DEFAULT '👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS leave_inbox_text TEXT DEFAULT '😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_video_button_text VARCHAR(100) DEFAULT '🎬 ভিডিও ওপেন করুন';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_start_button_text VARCHAR(100) DEFAULT '🚀 Start Bot';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_rejoin_button_text VARCHAR(100) DEFAULT '🔄 আবার Join করুন';
+
+CREATE TABLE IF NOT EXISTS managed_chats (
+  chat_id BIGINT PRIMARY KEY,
+  title VARCHAR(255),
+  chat_type VARCHAR(30) DEFAULT 'group',
+  join_url TEXT,
+  enabled BOOLEAN DEFAULT TRUE,
+  join_request_welcome BOOLEAN DEFAULT TRUE,
+  direct_join_welcome BOOLEAN DEFAULT TRUE,
+  leave_welcome BOOLEAN DEFAULT TRUE,
+  auto_approve BOOLEAN,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_managed_chats_enabled ON managed_chats(enabled);
+
+CREATE TABLE IF NOT EXISTS join_leave_events (
+  id BIGSERIAL PRIMARY KEY,
+  chat_id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  event_type VARCHAR(30) NOT NULL,
+  inbox_sent BOOLEAN DEFAULT FALSE,
+  error_text TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_join_leave_events_chat ON join_leave_events(chat_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_join_leave_events_user ON join_leave_events(user_id, created_at DESC);
