@@ -154,7 +154,7 @@ async def get_settings():
     try:
         row = await db_fetchone("SELECT * FROM app_settings WHERE id='main' LIMIT 1")
         if row:
-            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"):
+            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"):
                 if key in row:
                     row[key] = bool(row[key])
             return row
@@ -180,6 +180,8 @@ async def get_settings():
         "comments_enabled": True, "reactions_enabled": True, "favorites_enabled": True, "profile_stats_enabled": True,
         "adsgram_enabled": True, "adsgram_block_id": "int-45179", "required_ads_default": 1,
         "ad_button_text": "📢 Ad দেখুন", "ad_unlock_text": "🔓 ভিডিও আনলক করুন",
+        "monetization_mode": "both", "monetag_enabled": True, "monetag_zone_id": "11404425",
+        "monetag_required_default": 1, "monetag_button_text": "💰 Monetag Ad দেখুন", "monetag_wait_seconds": 20,
         "welcome_manager_enabled": True,
         "join_request_welcome_enabled": True,
         "direct_join_welcome_enabled": True,
@@ -887,7 +889,7 @@ async def index_handler(request):
 
 
 async def health_handler(request):
-    return web.json_response({"ok": True, "service": "viral-video-bot-v18", "database": "postgresql", "mini_bot": MINI_BOT_USERNAME, "notification_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
+    return web.json_response({"ok": True, "service": "viral-video-bot-v19", "database": "postgresql", "mini_bot": MINI_BOT_USERNAME, "notification_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
 
 
 async def api_bootstrap(request):
@@ -1101,16 +1103,19 @@ async def api_unlock_url(request):
     row = await db_fetchone("SELECT video_code,short_url,required_ads,delivery_mode FROM videos WHERE id=%s AND published=TRUE", (vid,))
     if not row:
         raise web.HTTPNotFound(text="Package not found")
-    required = int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
-    if settings.get("adsgram_enabled", True) and required > 0:
-        done = int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s", (int(u["id"]), vid)))["c"] or 0)
-        if done < required:
-            raise web.HTTPForbidden(text=f"Complete ads first ({done}/{required})")
+    mode = str(settings.get("monetization_mode") or "both").lower()
+    ads_req = int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
+    mon_req = int(settings.get("monetag_required_default") or 1)
+    ads_done = int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s AND provider='adsgram'", (int(u["id"]), vid)))["c"] or 0)
+    mon_done = int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s AND provider='monetag'", (int(u["id"]), vid)))["c"] or 0)
+    if mode in ("adsgram","both") and settings.get("adsgram_enabled", True) and ads_done < ads_req:
+        raise web.HTTPForbidden(text=f"Complete AdsGram first ({ads_done}/{ads_req})")
+    if mode in ("monetag","both") and settings.get("monetag_enabled", True) and mon_done < mon_req:
+        raise web.HTTPForbidden(text=f"Complete Monetag first ({mon_done}/{mon_req})")
     await db_execute("INSERT INTO user_video_events(user_id,video_id,video_code,event_type,created_at) VALUES(%s,%s,%s,'unlock_granted',%s)", (int(u["id"]), vid, row.get("video_code"), utcnow_sql()))
-    mode = (row.get("delivery_mode") or "video_bot").strip()
-    if mode == "short_link" and row.get("short_url"):
-        target = row.get("short_url")
-        return web.json_response({"ok": True, "url": target, "mode": "short_link"})
+    dmode = (row.get("delivery_mode") or "video_bot").strip()
+    if dmode == "short_link" and row.get("short_url"):
+        return web.json_response({"ok": True, "url": row.get("short_url"), "mode": "short_link"})
     target = f"https://t.me/{VIDEO_BOT_USERNAME}?start={row.get('video_code')}"
     return web.json_response({"ok": True, "url": target, "mode": "video_bot", "video_bot_username": VIDEO_BOT_USERNAME})
 
@@ -1125,65 +1130,51 @@ async def api_unlock_click(request):
 
 
 async def api_ad_status(request):
-    u = request_user(request)
-    if not u:
-        raise web.HTTPUnauthorized(text="Telegram authorization required")
-    vid = request.match_info["video_id"]
-    settings = await get_settings()
-    row = await db_fetchone("SELECT required_ads FROM videos WHERE id=%s AND published=TRUE", (vid,))
-    if not row:
-        raise web.HTTPNotFound(text="Package not found")
-    required = int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
-    done = int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s", (int(u["id"]), vid)))["c"] or 0)
-    enabled = bool(settings.get("adsgram_enabled", True)) and required > 0
-    return web.json_response({
-        "enabled": enabled, "required": required, "completed": min(done, required), "unlocked": (not enabled) or done >= required,
-        "block_id": settings.get("adsgram_block_id") or "int-45179",
-        "ad_button_text": settings.get("ad_button_text") or "📢 Ad দেখুন",
-        "unlock_text": settings.get("ad_unlock_text") or "🔓 ভিডিও আনলক করুন",
-    })
-
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
+    vid=request.match_info["video_id"]; settings=await get_settings()
+    row=await db_fetchone("SELECT required_ads FROM videos WHERE id=%s AND published=TRUE",(vid,))
+    if not row: raise web.HTTPNotFound(text="Package not found")
+    mode=str(settings.get("monetization_mode") or "both").lower()
+    ads_req=int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
+    mon_req=int(settings.get("monetag_required_default") or 1)
+    ads_done=int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s AND provider='adsgram'",(int(u['id']),vid)))["c"] or 0)
+    mon_done=int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s AND provider='monetag'",(int(u['id']),vid)))["c"] or 0)
+    ads_enabled=bool(settings.get("adsgram_enabled",True)) and mode in ("adsgram","both") and ads_req>0
+    mon_enabled=bool(settings.get("monetag_enabled",True)) and mode in ("monetag","both") and mon_req>0
+    unlocked=(not ads_enabled or ads_done>=ads_req) and (not mon_enabled or mon_done>=mon_req)
+    return web.json_response({"enabled":ads_enabled or mon_enabled,"unlocked":unlocked,"mode":mode,
+      "adsgram":{"enabled":ads_enabled,"required":ads_req,"completed":min(ads_done,ads_req),"block_id":settings.get("adsgram_block_id") or "int-45179","button_text":settings.get("ad_button_text") or "📢 AdsGram Ad দেখুন"},
+      "monetag":{"enabled":mon_enabled,"required":mon_req,"completed":min(mon_done,mon_req),"zone_id":str(settings.get("monetag_zone_id") or "11404425"),"button_text":settings.get("monetag_button_text") or "💰 Monetag Ad দেখুন","wait_seconds":int(settings.get("monetag_wait_seconds") or 20)},
+      "unlock_text":settings.get("ad_unlock_text") or "🔓 ভিডিও আনলক করুন"})
 
 async def api_ad_session(request):
-    u = request_user(request)
-    if not u:
-        raise web.HTTPUnauthorized(text="Telegram authorization required")
-    vid = request.match_info["video_id"]
-    settings = await get_settings()
-    if not settings.get("adsgram_enabled", True):
-        return web.json_response({"ok": True, "bypass": True})
-    row = await db_fetchone("SELECT id FROM videos WHERE id=%s AND published=TRUE", (vid,))
-    if not row:
-        raise web.HTTPNotFound(text="Package not found")
-    token = secrets.token_urlsafe(32)
-    await db_execute("INSERT INTO ad_sessions(session_token,user_id,video_id,status,created_at) VALUES(%s,%s,%s,'pending',%s)", (token, int(u["id"]), vid, utcnow_sql()))
-    return web.json_response({"ok": True, "session_token": token, "block_id": settings.get("adsgram_block_id") or "int-45179"})
-
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
+    vid=request.match_info["video_id"]; d=await json_body(request); provider=str(d.get("provider") or "adsgram").lower()
+    if provider not in {"adsgram","monetag"}: raise web.HTTPBadRequest(text="Unknown provider")
+    settings=await get_settings(); enabled=settings.get("adsgram_enabled",True) if provider=="adsgram" else settings.get("monetag_enabled",True)
+    if not enabled: return web.json_response({"ok":True,"bypass":True})
+    if not await db_fetchone("SELECT id FROM videos WHERE id=%s AND published=TRUE",(vid,)): raise web.HTTPNotFound(text="Package not found")
+    token=secrets.token_urlsafe(32)
+    await db_execute("INSERT INTO ad_sessions(session_token,user_id,video_id,status,provider,created_at) VALUES(%s,%s,%s,'pending',%s,%s)",(token,int(u['id']),vid,provider,utcnow_sql()))
+    return web.json_response({"ok":True,"session_token":token,"provider":provider,"block_id":settings.get("adsgram_block_id") or "int-45179","zone_id":str(settings.get("monetag_zone_id") or "11404425"),"wait_seconds":int(settings.get("monetag_wait_seconds") or 20)})
 
 async def api_ad_complete(request):
-    u = request_user(request)
-    if not u:
-        raise web.HTTPUnauthorized(text="Telegram authorization required")
-    vid = request.match_info["video_id"]
-    d = await json_body(request)
-    token = str(d.get("session_token") or "").strip()
-    if not token:
-        raise web.HTTPBadRequest(text="Missing ad session token")
-    sess = await db_fetchone("SELECT * FROM ad_sessions WHERE session_token=%s AND user_id=%s AND video_id=%s", (token, int(u["id"]), vid))
-    if not sess:
-        raise web.HTTPBadRequest(text="Invalid ad session")
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
+    vid=request.match_info["video_id"]; d=await json_body(request); token=str(d.get("session_token") or '').strip(); provider=str(d.get("provider") or '').lower()
+    if not token: raise web.HTTPBadRequest(text="Missing ad session token")
+    sess=await db_fetchone("SELECT * FROM ad_sessions WHERE session_token=%s AND user_id=%s AND video_id=%s",(token,int(u['id']),vid))
+    if not sess: raise web.HTTPBadRequest(text="Invalid ad session")
+    provider=provider or str(sess.get("provider") or "adsgram")
+    if provider != str(sess.get("provider") or provider): raise web.HTTPBadRequest(text="Provider mismatch")
     if sess.get("status") != "completed":
-        # Client callback marks completion. A provider server-side postback can replace this
-        # later if AdsGram supplies one for the account.
-        await db_execute("UPDATE ad_sessions SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE session_token=%s", (token,))
-        settings = await get_settings()
-        await db_execute("INSERT INTO ad_completions(user_id,video_id,session_token,provider,block_id,created_at) VALUES(%s,%s,%s,'adsgram',%s,%s) ON CONFLICT (session_token) DO NOTHING", (int(u["id"]), vid, token, settings.get("adsgram_block_id") or "int-45179", utcnow_sql()))
-        await db_execute("INSERT INTO user_video_events(user_id,video_id,event_type,created_at) VALUES(%s,%s,'ad_complete',%s)", (int(u["id"]), vid, utcnow_sql()))
-    settings = await get_settings()
-    row = await db_fetchone("SELECT required_ads FROM videos WHERE id=%s", (vid,))
-    required = int((row or {}).get("required_ads") if (row or {}).get("required_ads") is not None else (settings.get("required_ads_default") or 1))
-    done = int((await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE user_id=%s AND video_id=%s", (int(u["id"]), vid)))["c"] or 0)
-    return web.json_response({"ok": True, "required": required, "completed": min(done, required), "unlocked": done >= required})
+        await db_execute("UPDATE ad_sessions SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE session_token=%s",(token,))
+        settings=await get_settings(); ident=(settings.get("adsgram_block_id") or "int-45179") if provider=="adsgram" else str(settings.get("monetag_zone_id") or "11404425")
+        await db_execute("INSERT INTO ad_completions(user_id,video_id,session_token,provider,block_id,created_at) VALUES(%s,%s,%s,%s,%s,%s) ON CONFLICT (session_token) DO NOTHING",(int(u['id']),vid,token,provider,ident,utcnow_sql()))
+        await db_execute("INSERT INTO user_video_events(user_id,video_id,event_type,created_at) VALUES(%s,%s,%s,%s)",(int(u['id']),vid,provider+'_complete',utcnow_sql()))
+    return await api_ad_status(request)
 
 
 async def api_admin_drafts(request):
@@ -1286,10 +1277,11 @@ async def api_admin_settings_save(request):
         "storage_channel_id", "maintenance_message", "support_url", "join_channel_url", "start_button_text",
         "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled",
         "adsgram_enabled", "adsgram_block_id", "required_ads_default", "ad_button_text", "ad_unlock_text",
+        "monetization_mode", "monetag_enabled", "monetag_zone_id", "monetag_required_default", "monetag_button_text", "monetag_wait_seconds",
         "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests",
         "join_welcome_text", "leave_inbox_text", "welcome_video_button_text", "welcome_start_button_text", "welcome_rejoin_button_text"
     ]
-    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"}
+    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"}
 
     vals = []
     for f in fields:
@@ -1301,11 +1293,16 @@ async def api_admin_settings_save(request):
                 v = max(1, min(1440, int(v or 20)))
             except Exception:
                 v = 20
-        elif f == "required_ads_default":
+        elif f in {"required_ads_default", "monetag_required_default"}:
             try:
                 v = max(0, min(10, int(v or 1)))
             except Exception:
                 v = 1
+        elif f == "monetag_wait_seconds":
+            try: v = max(0, min(120, int(v or 20)))
+            except Exception: v = 20
+        elif f == "monetization_mode":
+            v = str(v or "both").lower(); v = v if v in {"adsgram","monetag","both","off"} else "both"
         elif f == "storage_channel_id":
             try:
                 v = int(v) if v not in (None, "") else None
