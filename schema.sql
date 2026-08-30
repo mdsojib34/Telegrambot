@@ -245,3 +245,7 @@ CREATE TABLE IF NOT EXISTS upload_drafts (
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_upload_drafts_pending ON upload_drafts(consumed, created_at DESC);
+
+-- V16 smart auto thumbnail + multi-admin notification metadata
+ALTER TABLE upload_drafts ADD COLUMN IF NOT EXISTS uploader_label VARCHAR(255) DEFAULT 'Channel Upload';
+CREATE INDEX IF NOT EXISTS idx_upload_drafts_uploader ON upload_drafts(uploader_label);
