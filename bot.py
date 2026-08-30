@@ -480,6 +480,62 @@ def _draft_title_and_overlay(caption: str):
     return title, overlay
 
 
+def _channel_uploader_label(message: Message) -> str:
+    """Best-effort uploader label. Telegram channel posts only expose the admin name when signatures are enabled."""
+    author = (getattr(message, "author_signature", None) or "").strip()
+    if author:
+        return author[:255]
+    sender_chat = getattr(message, "sender_chat", None)
+    title = (getattr(sender_chat, "title", None) or "").strip() if sender_chat else ""
+    return title[:255] if title else "Channel Upload"
+
+
+async def _notify_all_admins_new_video(*, code: str, deep_link: str, caption: str, auto_thumb: str, channel_id: int, uploader_label: str):
+    """Send the same new-video card to Owner + every configured admin."""
+    settings = await get_settings()
+    web_url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
+    rows = []
+    try:
+        rows = await db_fetchall("SELECT user_id,display_name FROM admin_users")
+    except Exception:
+        log.exception("admin notification target load failed")
+    targets = {OWNER_ID: "Owner"}
+    for r in rows:
+        try:
+            targets[int(r["user_id"])] = r.get("display_name") or "Admin"
+        except Exception:
+            pass
+
+    buttons = [[InlineKeyboardButton(text="🔗 Video Bot Link খুলুন", url=deep_link)]]
+    if valid_webapp_url(web_url):
+        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel খুলুন", web_app=WebAppInfo(url=web_url))])
+    buttons.append([InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")])
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    note = (
+        f"✅ <b>নতুন ভিডিও detect হয়েছে</b>\n\n"
+        f"🆔 Video Code: <code>{code}</code>\n"
+        f"📦 Storage Channel: <code>{channel_id}</code>\n"
+        f"👤 Uploaded by: <b>{uploader_label}</b>\n"
+        f"🤖 Video Bot Link:\n<code>{deep_link}</code>\n\n"
+        "🖼️ Full video থেকে Telegram-এর auto preview frame নিয়ে 16:9 thumbnail draft তৈরি হয়েছে।\n"
+        "✍️ Channel caption thumbnail-এর premium colored overlay হিসেবে থাকবে।\n"
+        "⚙️ Admin → ভিডিও ম্যানেজ থেকে Auto Draft ব্যবহার করুন; চাইলে Manual Thumbnail দিয়ে replace করতে পারবেন।\n\n"
+        f"📝 Caption: {caption[:500]}"
+    )
+
+    for uid in targets:
+        try:
+            if auto_thumb:
+                header, encoded = auto_thumb.split(",", 1)
+                photo = BufferedInputFile(base64.b64decode(encoded), filename=f"{code}_thumb.jpg")
+                await bot.send_photo(uid, photo=photo, caption=note, parse_mode=ParseMode.HTML, reply_markup=kb)
+            else:
+                await bot.send_message(uid, note, parse_mode=ParseMode.HTML, reply_markup=kb)
+        except Exception:
+            log.exception("new video admin notification failed uid=%s", uid)
+
+
 @dp.channel_post()
 async def storage_channel_post(message: Message):
     if message.chat.id != await current_storage_channel_id():
@@ -505,35 +561,21 @@ async def storage_channel_post(message: Message):
     auto_thumb = await _telegram_thumb_data_uri(message)
     try:
         await db_execute(
-            """INSERT INTO upload_drafts(video_code,channel_id,message_id,title,caption_text,thumb,deep_link,consumed,created_at)
-               VALUES(%s,%s,%s,%s,%s,%s,%s,FALSE,%s)
+            """INSERT INTO upload_drafts(video_code,channel_id,message_id,title,caption_text,thumb,deep_link,uploader_label,consumed,created_at)
+               VALUES(%s,%s,%s,%s,%s,%s,%s,%s,FALSE,%s)
                ON CONFLICT (video_code) DO UPDATE SET channel_id=EXCLUDED.channel_id,message_id=EXCLUDED.message_id,
                title=EXCLUDED.title,caption_text=EXCLUDED.caption_text,thumb=CASE WHEN EXCLUDED.thumb<>'' THEN EXCLUDED.thumb ELSE upload_drafts.thumb END,
-               deep_link=EXCLUDED.deep_link,consumed=FALSE,created_at=EXCLUDED.created_at""",
-            (code, message.chat.id, message.message_id, draft_title, thumb_text, auto_thumb, deep_link, utcnow_sql()),
+               deep_link=EXCLUDED.deep_link,uploader_label=EXCLUDED.uploader_label,consumed=FALSE,created_at=EXCLUDED.created_at""",
+            (code, message.chat.id, message.message_id, draft_title, thumb_text, auto_thumb, deep_link, _channel_uploader_label(message), utcnow_sql()),
         )
     except Exception:
         log.exception("auto draft save failed")
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔗 Video Bot Link খুলুন", url=deep_link)],
-        [InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")],
-    ])
-    note = (
-        f"✅ নতুন ভিডিও detect হয়েছে\n\nStorage Channel: <code>{message.chat.id}</code>\nVideo Code: <code>{code}</code>\nVideo Bot Link:\n<code>{deep_link}</code>\n\n"
-        "🖼️ Auto Thumbnail Draft তৈরি হয়েছে। Mini App → Admin → ভিডিও ম্যানেজ-এ গিয়ে ‘Auto Draft ব্যবহার করুন’ চাপুন।\n"
-        "✍️ Channel caption thumbnail-এর colored text হিসেবে auto বসবে; চাইলে edit বা manual thumbnail replace করতে পারবেন।\n\n"
-        f"Channel caption: {caption[:500]}"
+    uploader_label = _channel_uploader_label(message)
+    await _notify_all_admins_new_video(
+        code=code, deep_link=deep_link, caption=caption, auto_thumb=auto_thumb,
+        channel_id=message.chat.id, uploader_label=uploader_label,
     )
-    if auto_thumb:
-        try:
-            header, encoded = auto_thumb.split(",", 1)
-            photo = BufferedInputFile(base64.b64decode(encoded), filename="auto_thumb.jpg")
-            await bot.send_photo(OWNER_ID, photo=photo, caption=note, parse_mode=ParseMode.HTML, reply_markup=kb)
-            return
-        except Exception:
-            log.exception("owner auto thumbnail preview failed")
-    await bot.send_message(OWNER_ID, note, parse_mode=ParseMode.HTML, reply_markup=kb)
 
 
 @dp.callback_query(F.data.startswith("set_tutorial:"))
@@ -692,9 +734,17 @@ async def api_bootstrap(request):
         total_users = (await db_fetchone("SELECT COUNT(*) c FROM bot_users"))["c"]
         requests = (await db_fetchone("SELECT COUNT(*) c FROM video_requests"))["c"]
         unlocks=(await db_fetchone("SELECT COUNT(*) c FROM video_requests WHERE delivered=TRUE"))["c"]
+        unlocks_today=(await db_fetchone("SELECT COUNT(*) c FROM video_requests WHERE delivered=TRUE AND created_at >= CURRENT_DATE"))["c"]
+        ads_watched=(await db_fetchone("SELECT COUNT(*) c FROM ad_completions"))["c"]
+        ads_watched_today=(await db_fetchone("SELECT COUNT(*) c FROM ad_completions WHERE created_at >= CURRENT_DATE"))["c"]
         comments_count=(await db_fetchone("SELECT COUNT(*) c FROM comments"))["c"]
         reactions_count=(await db_fetchone("SELECT COUNT(*) c FROM reactions"))["c"]
-        stats = {"total_users": total_users, "video_requests": requests, "unlocks":unlocks, "comments":comments_count, "reactions":reactions_count}
+        stats = {
+            "total_users": total_users, "video_requests": requests,
+            "unlocks": unlocks, "unlocks_today": unlocks_today,
+            "ads_watched": ads_watched, "ads_watched_today": ads_watched_today,
+            "comments": comments_count, "reactions": reactions_count
+        }
     payload = {
         "videos": videos,
         "categories": categories,
