@@ -314,3 +314,14 @@ ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_bot_enabled BOOLEAN DEFA
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_layout VARCHAR(30) DEFAULT 'phone_gallery';
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_show_description BOOLEAN DEFAULT TRUE;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_show_social BOOLEAN DEFAULT TRUE;
+
+
+-- V19 AdsGram + Monetag dual monetization
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetization_mode VARCHAR(20) DEFAULT 'both';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_zone_id VARCHAR(100) DEFAULT '11404425';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_required_default INTEGER DEFAULT 1;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_button_text VARCHAR(100) DEFAULT '💰 Monetag Ad দেখুন';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_wait_seconds INTEGER DEFAULT 20;
+ALTER TABLE ad_sessions ADD COLUMN IF NOT EXISTS provider VARCHAR(40) DEFAULT 'adsgram';
+CREATE INDEX IF NOT EXISTS idx_ad_completions_provider ON ad_completions(provider, created_at DESC);
