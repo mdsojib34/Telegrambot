@@ -391,6 +391,31 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 .bot-role-card{background:linear-gradient(145deg,#141a2e,#0d1221);border:1px solid rgba(135,114,255,.18);border-radius:17px;padding:13px}
 .bot-role-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.bot-role-name{font-weight:900;font-size:13px}.bot-role-sub{font-size:9px;color:var(--muted);margin-top:3px}.bot-status-dot{width:9px;height:9px;border-radius:50%;background:#64748b}.bot-status-dot.ok{background:#20d889;box-shadow:0 0 12px rgba(32,216,137,.65)}
 
+
+/* ===== V19.2 PREMIUM VIDEO DETAILS ===== */
+#modal-detail .modal-sheet{background:linear-gradient(180deg,#091224 0%,#07101f 100%);border:1px solid rgba(116,96,230,.16);border-radius:28px 28px 0 0;overflow:hidden}
+#modal-detail .sheet-header{padding:17px 20px;background:linear-gradient(180deg,rgba(12,24,45,.98),rgba(9,18,35,.96));border-bottom:1px solid rgba(132,111,255,.16)}
+#modal-detail .sheet-content{padding:14px 20px 30px}
+#modal-detail #md-media-container{border-radius:22px!important;box-shadow:0 18px 50px rgba(0,0,0,.36)!important;border:1px solid rgba(255,255,255,.06);position:relative}
+.v192-media-shell{width:100%;height:100%;position:relative;background:#000}
+.v192-media-shell>img{width:100%;height:100%;object-fit:cover}
+.v192-demo-badge,.v192-duration,.v192-protected{position:absolute;z-index:2;background:rgba(7,12,22,.78);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08);color:#fff}
+.v192-demo-badge{left:14px;top:14px;padding:7px 11px;border-radius:11px;font-weight:800;font-size:11px}
+.v192-duration{right:14px;top:14px;padding:7px 10px;border-radius:11px;font-weight:800;font-size:11px}
+.v192-protected{left:14px;bottom:14px;padding:7px 11px;border-radius:11px;font-size:10px}
+.v192-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(9,8,17,.68);border:1px solid rgba(255,255,255,.1);font-size:25px;color:#fff}
+.v192-title-wrap{margin-top:17px}.v192-title-wrap h2{font-size:21px!important;font-weight:900!important;line-height:1.35!important;color:#fff}.v192-subtitle{margin-top:6px;font-size:12px;color:#9ba8c1;line-height:1.5}
+.detail-metrics-row{gap:10px!important;margin-top:17px!important}.metric-box{padding:15px 9px!important;border-radius:18px!important;background:linear-gradient(145deg,#111a31,#0b1428)!important;border:1px solid rgba(126,103,238,.18)!important;box-shadow:none!important}.metric-icon{font-size:22px!important}.metric-val{font-size:18px!important;font-weight:900!important}.metric-lbl{font-size:8px!important;letter-spacing:.05em;text-transform:uppercase}
+.v192-unlock-card{margin-top:18px;padding:18px;border-radius:22px;background:radial-gradient(100% 140% at 0% 0%,rgba(112,61,245,.32),transparent 52%),linear-gradient(135deg,#17163b,#25154b 60%,#3e1453);border:1px solid rgba(168,91,255,.46);box-shadow:0 15px 36px rgba(83,42,165,.18)}
+.v192-unlock-head{display:flex;gap:12px;align-items:center}.v192-unlock-icon{width:54px;height:54px;flex:0 0 54px;border-radius:18px;display:grid;place-items:center;font-size:28px;background:rgba(155,77,255,.18);border:1px solid rgba(177,98,255,.25)}.v192-unlock-copy{min-width:0}.v192-unlock-title{font-size:17px;font-weight:900;color:#fff}.v192-unlock-sub{margin-top:4px;font-size:11px;color:#b9b8ce;line-height:1.45}
+.v192-provider-stack{margin-top:13px;display:grid;gap:9px}.v192-provider{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border-radius:16px;background:rgba(8,14,29,.56);border:1px solid rgba(255,255,255,.07)}.v192-provider-name{font-size:11px;font-weight:800;color:#fff}.v192-provider-progress{margin-top:3px;font-size:9px;color:#8f9bb2}.v192-provider .btn{width:auto;min-width:138px;margin:0;padding:10px 12px;border-radius:13px;font-size:10px;font-weight:800}
+.v192-main-action{width:100%;margin-top:13px;padding:13px 15px;border:0;border-radius:15px;background:linear-gradient(90deg,#6945ff,#bc26ea);color:#fff;font-weight:900;font-size:13px;box-shadow:0 10px 26px rgba(131,57,246,.22)}
+.v192-secure{display:flex;justify-content:center;gap:6px;align-items:center;margin-top:10px;color:#9aa6bd;font-size:9px}
+.v192-loading,.v192-error{margin-top:18px;padding:18px;border-radius:20px;text-align:center;background:linear-gradient(145deg,#11192c,#0b1426);border:1px solid rgba(125,104,235,.18);color:#9ba7bd}.v192-error b{display:block;color:#fff;font-size:13px;margin-bottom:6px}
+.detail-actions-row{gap:10px!important;margin-top:18px!important}.detail-actions-row .btn{border-radius:15px!important;padding:12px 8px!important;font-size:11px!important}.detail-actions-row .btn-p{background:linear-gradient(90deg,#6b43ff,#b325e5)!important}
+#comments-section-anchor{margin-top:24px!important;padding-top:20px!important}#md-comment-input{background:#0d172b!important;border-color:rgba(128,108,226,.2)!important;border-radius:15px!important;padding:13px 14px!important}
+@media(max-width:380px){.v192-provider{grid-template-columns:1fr}.v192-provider .btn{width:100%}.v192-title-wrap h2{font-size:18px!important}}
+
 </style>
 </head>
 <body>
@@ -776,8 +801,9 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
     <div class="sheet-content">
       <div id="md-media-container" style="width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#000;box-shadow:var(--shadow-card)"></div>
       
-      <div style="margin-top:15px">
-        <h2 id="md-title" style="font-size:16px;font-weight:700;line-height:1.4"></h2>
+      <div class="v192-title-wrap">
+        <h2 id="md-title"></h2>
+        <div id="md-subtitle" class="v192-subtitle">সাবস্ক্রাইবারদের জন্য স্পেশাল ভিডিও 🤗</div>
       </div>
 
       <div class="detail-metrics-row">
@@ -1318,10 +1344,11 @@ async function updateDetailUI(v) {
   if(reactCount) reactCount.textContent = Number(v.reaction_count||0);
 
   const mediaCont = document.getElementById('md-media-container');
-  if(mediaCont) mediaCont.innerHTML = `<div style="width:100%;height:100%;position:relative;background:#000"><img src="${v.thumb || ''}" style="width:100%;height:100%;object-fit:cover">${v.thumb_text?`<div class="thumb-caption-overlay" style="bottom:42px"><span>${escapeHtml(v.thumb_text)}</span></div>`:''}<div style="position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.72);padding:6px 10px;border-radius:8px;font-size:11px">🔒 Bot Delivery • Protected</div></div>`;
+  if(mediaCont) mediaCont.innerHTML = `<div class="v192-media-shell"><img src="${v.thumb || ''}" alt="Video thumbnail"><div class="v192-demo-badge">🤍 Demo</div><div class="v192-duration">${escapeHtml(v.duration_text||v.duration||'')}</div><div class="v192-play">▶</div>${v.thumb_text?`<div class="thumb-caption-overlay" style="bottom:52px"><span>${escapeHtml(v.thumb_text)}</span></div>`:''}<div class="v192-protected">🔒 Protected Video</div></div>`;
+  const sub=document.getElementById('md-subtitle'); if(sub) sub.textContent = v.description || v.subtitle || 'সাবস্ক্রাইবারদের জন্য স্পেশাল ভিডিও 🤗';
 
   const actionArea = document.getElementById('md-action-area');
-  if(actionArea) { actionArea.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted)">Ad status loading...</div>'; await renderAdGate(v); }
+  if(actionArea) { actionArea.innerHTML = '<div class="v192-loading">ভিডিও প্রস্তুত করা হচ্ছে…</div>'; await renderAdGate(v); }
   renderComments(v.id);
 }
 
@@ -1337,24 +1364,34 @@ async function ensureMonetagSdk(zoneId){
 
 async function renderAdGate(v){
   const area=document.getElementById('md-action-area'); if(!area||!v)return;
-  area.innerHTML='<div style="padding:12px;text-align:center;color:var(--muted);font-size:11px">⏳ Ad status loading...</div>';
+  area.innerHTML='<div class="v192-loading">ভিডিও প্রস্তুত করা হচ্ছে…</div>';
   try{
     const controller=new AbortController();
     const timeoutId=setTimeout(()=>controller.abort(),8000);
     let st;
-    try{
-      st=await apiFetch('/api/videos/'+encodeURIComponent(v.id)+'/ad-status',{signal:controller.signal});
-    } finally { clearTimeout(timeoutId); }
-    if(st.unlocked){ area.innerHTML=`<div style="margin-top:12px;padding:11px;border-radius:14px;background:rgba(32,216,137,.08);border:1px solid rgba(32,216,137,.2)"><b style="color:#8ff2c1">✅ Unlock requirements complete</b></div><button class="btn btn-p" style="margin-top:9px" onclick="openUnlockedVideo('${v.id}')">${st.unlock_text||'🔓 ভিডিও আনলক করুন'}</button>`; return; }
+    try{ st=await apiFetch('/api/videos/'+encodeURIComponent(v.id)+'/ad-status',{signal:controller.signal}); }
+    finally { clearTimeout(timeoutId); }
+
+    if(st.unlocked){
+      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিওটি প্রস্তুত 💜</div><div class="v192-unlock-sub">আপনার অ্যাক্সেস সম্পন্ন হয়েছে। এখন ভিডিওটি খুলুন।</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">▶ ${escapeHtml(st.unlock_text||'ভিডিও দেখুন')}</button><div class="v192-secure">🛡️ Protected delivery • নিরাপদ অ্যাক্সেস</div></div>`;
+      return;
+    }
+
     const a=st.adsgram||{}, m=st.monetag||{};
-    const rows=[];
-    if(a.enabled) rows.push(`<div class="v19-ad-row"><div><b>📢 AdsGram</b><small>${a.completed}/${a.required} complete</small></div><button class="btn btn-s" id="adsgram-watch-btn" onclick="watchProviderAd('${v.id}','adsgram')">${a.button_text||'AdsGram Ad দেখুন'}</button></div>`);
-    if(m.enabled) rows.push(`<div class="v19-ad-row"><div><b>💰 Monetag</b><small>${m.completed}/${m.required} complete · ${m.wait_seconds||20}s</small></div><button class="btn btn-p" id="monetag-watch-btn" onclick="watchProviderAd('${v.id}','monetag')">${m.button_text||'Monetag Ad দেখুন'}</button></div>`);
-    area.innerHTML=`<style>.v19-ad-row{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;margin-top:8px;padding:9px;border-radius:14px;background:#111728;border:1px solid rgba(124,77,255,.18)}.v19-ad-row b{font-size:11px}.v19-ad-row small{display:block;font-size:8px;color:var(--muted);margin-top:2px}.v19-ad-row .btn{padding:9px 8px;font-size:10px}</style><div style="margin-top:12px;padding:11px;border-radius:15px;background:#0e1424;border:1px solid rgba(124,77,255,.2)"><b style="font-size:12px">🎯 ভিডিও আনলক করতে প্রয়োজনীয় Ad সম্পন্ন করুন</b><div style="font-size:9px;color:var(--muted);margin-top:4px">Mode: ${escapeHtml(st.mode||'both')}</div></div>${rows.join('')}`;
+    const providers=[];
+    if(a.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${a.completed}/${a.required} সম্পন্ন</div></div><button class="btn btn-p" id="adsgram-watch-btn" onclick="watchProviderAd('${v.id}','adsgram')">▶ চালিয়ে যান</button></div>`);
+    if(m.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${m.completed}/${m.required} সম্পন্ন${m.wait_seconds?` • ${m.wait_seconds}s`:''}</div></div><button class="btn btn-p" id="monetag-watch-btn" onclick="watchProviderAd('${v.id}','monetag')">▶ চালিয়ে যান</button></div>`);
+
+    if(!providers.length){
+      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিও দেখতে চান?</div><div class="v192-unlock-sub">ভিডিওটি খুলতে নিচের বাটনে চাপুন।</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">▶ ভিডিও দেখুন</button><div class="v192-secure">🛡️ Protected delivery</div></div>`;
+      return;
+    }
+
+    area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিও দেখতে চান?</div><div class="v192-unlock-sub">প্রয়োজনীয় ধাপ সম্পন্ন হলে ভিডিওটি অটোমেটিক আনলক হবে 😊</div></div></div><div class="v192-provider-stack">${providers.join('')}</div><div class="v192-secure">🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়</div></div>`;
   }catch(e){
     console.error('Ad status load failed',e);
-    const msg=(e&&e.name==='AbortError')?'Ad status load হতে সময় লাগছে':'Ad status পাওয়া যায়নি';
-    area.innerHTML=`<div style="margin-top:10px;padding:12px;border-radius:14px;background:rgba(255,183,77,.08);border:1px solid rgba(255,183,77,.22);text-align:center"><div style="font-size:12px;font-weight:800">⚠️ ${msg}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">ইন্টারনেট/সার্ভার ঠিক থাকলে আবার চেষ্টা করুন।</div><button class="btn btn-g" style="margin-top:9px" onclick="renderAdGate(currentActiveVid)">🔄 আবার চেষ্টা করুন</button></div>`;
+    const msg=(e&&e.name==='AbortError')?'ভিডিও অ্যাক্সেস লোড হতে একটু সময় লাগছে':'ভিডিও অ্যাক্সেস এখন পাওয়া যাচ্ছে না';
+    area.innerHTML=`<div class="v192-error"><b>${msg}</b><div>ইন্টারনেট ঠিক থাকলে আবার চেষ্টা করুন।</div><button class="btn btn-g" style="margin-top:10px" onclick="renderAdGate(currentActiveVid)">🔄 আবার চেষ্টা করুন</button></div>`;
   }
 }
 
