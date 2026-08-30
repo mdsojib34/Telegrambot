@@ -290,3 +290,27 @@ CREATE TABLE IF NOT EXISTS join_leave_events (
 );
 CREATE INDEX IF NOT EXISTS idx_join_leave_events_chat ON join_leave_events(chat_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_join_leave_events_user ON join_leave_events(user_id, created_at DESC);
+
+-- =========================================================
+-- V18 THREE-BOT CENTRAL CONTROL
+-- MINI_BOT = Mini App launcher + admin control center
+-- BOT      = notification/community bot
+-- VIDEO_BOT = protected video delivery
+-- =========================================================
+CREATE TABLE IF NOT EXISTS mini_bot_users (
+  user_id BIGINT PRIMARY KEY,
+  username VARCHAR(255),
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
+  is_active BOOLEAN DEFAULT TRUE,
+  last_seen_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_mini_bot_users_seen ON mini_bot_users(last_seen_at DESC);
+
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS mini_bot_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS notification_bot_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_bot_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_layout VARCHAR(30) DEFAULT 'phone_gallery';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_show_description BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS gallery_show_social BOOLEAN DEFAULT TRUE;
