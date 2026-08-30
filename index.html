@@ -475,6 +475,7 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
     <button class="tab" onclick="switchAdminSubView('broadcast', this)">📢 Broadcast</button>
     <button class="tab" onclick="switchAdminSubView('users', this)">👥 Users</button>
     <button class="tab" id="admin-admins-tab" onclick="switchAdminSubView('admins', this)">👑 Admins</button>
+    <button class="tab" onclick="switchAdminSubView('joinleave', this)">👋 Join/Leave</button>
     <button class="tab" onclick="switchAdminSubView('settings', this)" data-i18n="settings">সেটিংস</button>
   </div>
   
@@ -587,6 +588,36 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
     <div id="admin-admin-list"></div>
   </div>
 
+  <div id="admin-joinleave" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>👋 Join / Leave Welcome Manager</h4>
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin:8px 0 14px">Bot-কে Group/Channel-এর Admin করলে chat অটো detect হবে। Join Request এলে user_chat_id দিয়ে inbox welcome পাঠানোর চেষ্টা হবে; normal Join/Leave-এ user আগে Bot start করে থাকলে inbox message যাবে।</p>
+      <div class="setting-grid">
+        <div class="form-group full"><label>Chat ID</label><input id="jl-chat-id" inputmode="numeric" placeholder="-1001234567890"></div>
+        <div class="form-group"><label>Chat Name</label><input id="jl-chat-title" placeholder="My Group / Channel"></div>
+        <div class="form-group"><label>Type</label><select id="jl-chat-type"><option value="group">Group</option><option value="supergroup">Supergroup</option><option value="channel">Channel</option></select></div>
+        <div class="form-group full"><label>Join / Invite URL</label><input id="jl-join-url" placeholder="https://t.me/+xxxx অথবা https://t.me/username"></div>
+      </div>
+      <div class="setting-grid" style="margin:10px 0 14px">
+        <label><input type="checkbox" id="jl-enabled" checked> Enabled</label>
+        <label><input type="checkbox" id="jl-join-request" checked> Join Request Welcome</label>
+        <label><input type="checkbox" id="jl-direct-join" checked> Direct Join Welcome</label>
+        <label><input type="checkbox" id="jl-leave" checked> Leave Inbox</label>
+        <label><input type="checkbox" id="jl-auto-approve"> Auto Approve Join Request</label>
+      </div>
+      <button class="btn btn-p" onclick="saveManagedChat()">💾 Chat Save / Update</button>
+      <button class="btn btn-g" style="margin-top:8px" onclick="clearManagedChatForm()">➕ New Chat</button>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <div class="dashboard-stat"><div class="label">👋 Join Events</div><div class="value" id="jl-stat-joins">0</div></div>
+      <div class="dashboard-stat"><div class="label">👋 Inbox Sent</div><div class="value" id="jl-stat-sent">0</div></div>
+      <div class="dashboard-stat"><div class="label">🚪 Leave Events</div><div class="value" id="jl-stat-leaves">0</div></div>
+      <div class="dashboard-stat"><div class="label">📊 Total Events</div><div class="value" id="jl-stat-total">0</div></div>
+    </div>
+    <div class="admin-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h4>📚 Managed Chats</h4><button class="btn btn-g" style="width:auto;padding:8px 12px" onclick="loadManagedChats()">🔄 Refresh</button></div></div>
+    <div id="managed-chat-list"></div>
+  </div>
+
   <div id="admin-settings" class="admin-subview hidden">
     <div class="admin-card">
       <h4>⚙️ Bot & Mini App Control</h4>
@@ -614,6 +645,23 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
         <div class="form-group"><label>Default Required Ads</label><input id="set-required-ads-default" type="number" min="0" max="10" value="1"></div>
         <div class="form-group"><label>Ad Button Text</label><input id="set-ad-button-text" value="📢 Ad দেখুন"></div>
         <div class="form-group"><label>Unlock Button Text</label><input id="set-ad-unlock-text" value="🔓 ভিডিও আনলক করুন"></div>
+      </div>
+      <div class="admin-card" style="margin:14px 0;background:rgba(73,215,255,.06);border:1px solid rgba(73,215,255,.20)">
+        <h4 style="margin-bottom:10px">👋 Join / Leave Inbox Welcome</h4>
+        <div class="setting-grid">
+          <label><input id="set-welcome-manager-enabled" type="checkbox" checked> Welcome Manager ON</label>
+          <label><input id="set-join-request-welcome-enabled" type="checkbox" checked> Join Request Inbox</label>
+          <label><input id="set-direct-join-welcome-enabled" type="checkbox" checked> Direct Join Inbox</label>
+          <label><input id="set-leave-inbox-enabled" type="checkbox" checked> Leave Inbox</label>
+          <label><input id="set-auto-approve-join-requests" type="checkbox"> Default Auto Approve</label>
+        </div>
+        <div class="form-group full" style="margin-top:10px"><label>Join Welcome Message</label><textarea id="set-join-welcome-text" rows="4" placeholder="👋 স্বাগতম!... "></textarea></div>
+        <div class="form-group full"><label>Leave Inbox Message</label><textarea id="set-leave-inbox-text" rows="4" placeholder="😢 আপনি গ্রুপ থেকে বের হয়েছেন..."></textarea></div>
+        <div class="setting-grid">
+          <div class="form-group"><label>Video Open Button</label><input id="set-welcome-video-button-text" placeholder="🎬 ভিডিও ওপেন করুন"></div>
+          <div class="form-group"><label>Start Bot Button</label><input id="set-welcome-start-button-text" placeholder="🚀 Start Bot"></div>
+          <div class="form-group full"><label>Rejoin Button</label><input id="set-welcome-rejoin-button-text" placeholder="🔄 আবার Join করুন"></div>
+        </div>
       </div>
       <div class="admin-card" style="margin:14px 0;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.22)">
         <h4 style="margin-bottom:10px">🎓 New User Tutorial</h4>
@@ -1521,17 +1569,17 @@ function renderAdmin() {
 
 async function loadAdminSettings() {
   const data=state.appSettings||{};
-  const map={'set-brand':data.brand_name,'set-brand-subtitle':data.brand_subtitle,'set-hero-text':data.hero_text,'set-nav-home':data.nav_home,'set-nav-fav':data.nav_fav,'set-nav-unlock':data.nav_unlock,'set-nav-viral':data.nav_viral,'set-nav-profile':data.nav_profile,'set-online-label':data.online_label,'set-webapp-url':data.web_app_url,'set-menu-button-text':data.bot_menu_button_text,'set-welcome-text':data.welcome_text,'set-watch-text':data.watch_button_text,'set-broadcast-text':data.broadcast_button_text,'set-delete-min':data.auto_delete_minutes,'set-tutorial-code':data.tutorial_video_code,'set-tutorial-caption':data.tutorial_caption,'set-tutorial-button':data.tutorial_button_text,'set-storage-channel':data.storage_channel_id,'set-maintenance-message':data.maintenance_message,'set-support-url':data.support_url,'set-join-channel-url':data.join_channel_url,'set-adsgram-block-id':data.adsgram_block_id,'set-required-ads-default':data.required_ads_default,'set-ad-button-text':data.ad_button_text,'set-ad-unlock-text':data.ad_unlock_text};
+  const map={'set-brand':data.brand_name,'set-brand-subtitle':data.brand_subtitle,'set-hero-text':data.hero_text,'set-nav-home':data.nav_home,'set-nav-fav':data.nav_fav,'set-nav-unlock':data.nav_unlock,'set-nav-viral':data.nav_viral,'set-nav-profile':data.nav_profile,'set-online-label':data.online_label,'set-webapp-url':data.web_app_url,'set-menu-button-text':data.bot_menu_button_text,'set-welcome-text':data.welcome_text,'set-watch-text':data.watch_button_text,'set-broadcast-text':data.broadcast_button_text,'set-delete-min':data.auto_delete_minutes,'set-tutorial-code':data.tutorial_video_code,'set-tutorial-caption':data.tutorial_caption,'set-tutorial-button':data.tutorial_button_text,'set-storage-channel':data.storage_channel_id,'set-maintenance-message':data.maintenance_message,'set-support-url':data.support_url,'set-join-channel-url':data.join_channel_url,'set-adsgram-block-id':data.adsgram_block_id,'set-required-ads-default':data.required_ads_default,'set-ad-button-text':data.ad_button_text,'set-ad-unlock-text':data.ad_unlock_text,'set-join-welcome-text':data.join_welcome_text,'set-leave-inbox-text':data.leave_inbox_text,'set-welcome-video-button-text':data.welcome_video_button_text,'set-welcome-start-button-text':data.welcome_start_button_text,'set-welcome-rejoin-button-text':data.welcome_rejoin_button_text};
   Object.entries(map).forEach(([id,val])=>{const el=document.getElementById(id);if(el&&val!==undefined&&val!==null)el.value=val;});
   const p=document.getElementById('set-protect');if(p)p.checked=data.protect_content!==false;
   const m=document.getElementById('set-maintenance');if(m)m.checked=!!data.maintenance_mode;
-  const so=document.getElementById('set-show-online');if(so)so.checked=data.show_online!==false;const ae=document.getElementById('set-adsgram-enabled');if(ae)ae.checked=data.adsgram_enabled!==false;const te=document.getElementById('set-tutorial-enabled');if(te)te.checked=data.tutorial_enabled!==false;['comments','reactions','favorites','profile-stats'].forEach(k=>{const el=document.getElementById('set-'+k+'-enabled');if(el)el.checked=data[k.replace('-', '_')+'_enabled']!==false;});applyAppSettings();
+  const so=document.getElementById('set-show-online');if(so)so.checked=data.show_online!==false;const wm=document.getElementById('set-welcome-manager-enabled');if(wm)wm.checked=data.welcome_manager_enabled!==false;const jrw=document.getElementById('set-join-request-welcome-enabled');if(jrw)jrw.checked=data.join_request_welcome_enabled!==false;const djw=document.getElementById('set-direct-join-welcome-enabled');if(djw)djw.checked=data.direct_join_welcome_enabled!==false;const lie=document.getElementById('set-leave-inbox-enabled');if(lie)lie.checked=data.leave_inbox_enabled!==false;const aar=document.getElementById('set-auto-approve-join-requests');if(aar)aar.checked=!!data.auto_approve_join_requests;const ae=document.getElementById('set-adsgram-enabled');if(ae)ae.checked=data.adsgram_enabled!==false;const te=document.getElementById('set-tutorial-enabled');if(te)te.checked=data.tutorial_enabled!==false;['comments','reactions','favorites','profile-stats'].forEach(k=>{const el=document.getElementById('set-'+k+'-enabled');if(el)el.checked=data[k.replace('-', '_')+'_enabled']!==false;});applyAppSettings();
 }
 let settingsSaveInFlight = false;
 async function saveAdminSettings() {
   if(settingsSaveInFlight) return;
   const gv=id=>document.getElementById(id)?.value?.trim();
-  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'নতুন ও ট্রেন্ডিং ভিডিও খুঁজুন, পছন্দ করুন এবং নিরাপদভাবে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'▶ ভিডিও দেখুন',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন'};
+  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'নতুন ও ট্রেন্ডিং ভিডিও খুঁজুন, পছন্দ করুন এবং নিরাপদভাবে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'▶ ভিডিও দেখুন',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন'};
   const btn=document.getElementById('settings-save-btn');
   settingsSaveInFlight=true;
   if(btn){btn.disabled=true;btn.textContent='⏳ সেভ হচ্ছে...';}
@@ -1570,6 +1618,34 @@ async function saveAdminUser(){
 }
 async function removeAdmin(id){if(!confirm('Admin remove করবেন?'))return;try{await apiFetch('/api/admin/admins/'+id,{method:'DELETE'});loadAdmins();}catch(e){showToast('Remove failed','danger');}}
 
+
+function clearManagedChatForm(){
+  ['jl-chat-id','jl-chat-title','jl-join-url'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const t=document.getElementById('jl-chat-type');if(t)t.value='group';
+  ['jl-enabled','jl-join-request','jl-direct-join','jl-leave'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=true;});
+  const a=document.getElementById('jl-auto-approve');if(a)a.checked=false;
+}
+let managedChatCache={};
+async function loadManagedChats(){
+  try{
+    const [d,st]=await Promise.all([apiFetch('/api/admin/managed-chats'),apiFetch('/api/admin/join-leave-stats')]);
+    const c=document.getElementById('managed-chat-list');
+    managedChatCache={};(d.chats||[]).forEach(x=>managedChatCache[String(x.chat_id)]=x);
+    c.innerHTML=(d.chats||[]).map(x=>`<div class="admin-list-item" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${escapeHtml(x.title||String(x.chat_id))}</b><div style="font-size:10px;color:var(--muted);line-height:1.55">${x.chat_type||'chat'} · ${x.chat_id}<br>${x.enabled?'🟢 Enabled':'🔴 Disabled'} · JoinReq ${x.join_request_welcome?'ON':'OFF'} · Join ${x.direct_join_welcome?'ON':'OFF'} · Leave ${x.leave_welcome?'ON':'OFF'}${x.join_url?'<br>'+escapeHtml(x.join_url):''}</div></div><div style="display:grid;gap:6px"><button class="btn btn-g" style="width:auto;padding:7px 10px" onclick="editManagedChatById('${x.chat_id}')">✏️ Edit</button><button class="btn btn-d" style="width:auto;padding:7px 10px" onclick="deleteManagedChat('${x.chat_id}')">🗑</button></div></div>`).join('')||'<div class="empty-state">এখনও কোনো managed chat নেই। Bot-কে group/channel Admin করলে auto detect হবে।</div>';
+    ['joins','sent','leaves','total'].forEach(k=>{const e=document.getElementById('jl-stat-'+k);if(e)e.textContent=Number(st[k]||0)});
+  }catch(e){showToast('Managed chats load failed: '+(e.message||''),'danger');}
+}
+function editManagedChatById(id){
+  const x=managedChatCache[String(id)];if(!x)return;
+  document.getElementById('jl-chat-id').value=x.chat_id||'';document.getElementById('jl-chat-title').value=x.title||'';document.getElementById('jl-chat-type').value=x.chat_type||'group';document.getElementById('jl-join-url').value=x.join_url||'';document.getElementById('jl-enabled').checked=x.enabled!==false;document.getElementById('jl-join-request').checked=x.join_request_welcome!==false;document.getElementById('jl-direct-join').checked=x.direct_join_welcome!==false;document.getElementById('jl-leave').checked=x.leave_welcome!==false;document.getElementById('jl-auto-approve').checked=!!x.auto_approve;window.scrollTo({top:0,behavior:'smooth'});
+}
+async function saveManagedChat(){
+  const id=parseInt(document.getElementById('jl-chat-id').value);if(!id)return showToast('Chat ID দিন','danger');
+  const body={chat_id:id,title:document.getElementById('jl-chat-title').value.trim()||String(id),chat_type:document.getElementById('jl-chat-type').value,join_url:document.getElementById('jl-join-url').value.trim()||null,enabled:document.getElementById('jl-enabled').checked,join_request_welcome:document.getElementById('jl-join-request').checked,direct_join_welcome:document.getElementById('jl-direct-join').checked,leave_welcome:document.getElementById('jl-leave').checked,auto_approve:document.getElementById('jl-auto-approve').checked};
+  try{await apiFetch('/api/admin/managed-chats',{method:'POST',body:JSON.stringify(body)});showToast('Chat settings saved ✅','success');loadManagedChats();}catch(e){showToast('Chat save failed: '+(e.message||''),'danger');}
+}
+async function deleteManagedChat(id){if(!confirm('এই chat Welcome Manager থেকে remove করবেন?'))return;try{await apiFetch('/api/admin/managed-chats/'+encodeURIComponent(id),{method:'DELETE'});loadManagedChats();}catch(e){showToast('Remove failed','danger')}}
+
 function switchAdminSubView(id, btn) {
   document.querySelectorAll('.admin-subview').forEach(v => v.classList.add('hidden'));
   const subview = document.getElementById('admin-' + id);
@@ -1577,6 +1653,7 @@ function switchAdminSubView(id, btn) {
   if(id==='vids') loadAutoDrafts();
   if(id==='users') loadAdminUsers();
   if(id==='admins') loadAdmins();
+  if(id==='joinleave') loadManagedChats();
   
   if(btn && btn.parentElement) {
     const tabs = btn.parentElement.querySelectorAll('.tab');
