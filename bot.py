@@ -35,6 +35,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("viral-video-bot")
 
+# V18 roles
+# MINI_BOT_* = launcher + Mini App + central admin control
+# BOT_*      = notification/community bot (broadcast + package notifications + join/leave)
+# VIDEO_BOT_* = protected video delivery bot
+MINI_BOT_TOKEN = os.environ["MINI_BOT_TOKEN"]
+MINI_BOT_USERNAME = os.getenv("MINI_BOT_USERNAME", "").lstrip("@")
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 BOT_USERNAME = os.getenv("BOT_USERNAME", "Bangladesh_vairal_videobot").lstrip("@")
 VIDEO_BOT_TOKEN = os.environ["VIDEO_BOT_TOKEN"]
@@ -52,8 +58,10 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INDEX_FILE = os.path.join(BASE_DIR, "index.html")
 
+mini_bot = Bot(MINI_BOT_TOKEN)
 bot = Bot(BOT_TOKEN)
 video_bot = Bot(VIDEO_BOT_TOKEN)
+mini_dp = Dispatcher()
 dp = Dispatcher()
 video_dp = Dispatcher()
 db_pool = None
@@ -185,6 +193,22 @@ async def get_settings():
     }
 
 
+async def save_mini_bot_user(message: Message):
+    u = message.from_user
+    if not u:
+        return
+    try:
+        await db_execute(
+            """INSERT INTO mini_bot_users(user_id,username,first_name,last_name,is_active,last_seen_at)
+               VALUES(%s,%s,%s,%s,TRUE,%s)
+               ON CONFLICT (user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,
+               last_name=EXCLUDED.last_name,is_active=TRUE,last_seen_at=EXCLUDED.last_seen_at""",
+            (u.id, u.username, u.first_name, u.last_name, utcnow_sql()),
+        )
+    except Exception:
+        log.exception("save mini bot user failed")
+
+
 async def save_user(message: Message):
     u = message.from_user
     if not u:
@@ -253,8 +277,8 @@ async def sync_menu_button(force_log: bool = False):
             log.warning("Menu button not set: MINI_APP_URL/web_app_url must be HTTPS")
         return False
     try:
-        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text=text, web_app=WebAppInfo(url=url)))
-        await bot.set_my_commands([BotCommand(command="start", description="Bot চালু করুন")])
+        await mini_bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text=text, web_app=WebAppInfo(url=url)))
+        await mini_bot.set_my_commands([BotCommand(command="start", description="Mini App খুলুন")])
         if force_log:
             log.info("Telegram menu button set: %s -> %s", text, url)
         return True
@@ -264,13 +288,22 @@ async def sync_menu_button(force_log: bool = False):
 
 
 async def webapp_keyboard(settings=None):
+    """CTA used by notification/community bot. Always route users to the Mini Bot.
+    A WebAppInfo button from this bot would sign initData with the wrong bot token.
+    """
+    label = ((settings or {}).get("bot_menu_button_text") if settings else None) or DEFAULT_MENU_BUTTON_TEXT
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=str(label)[:64], url=f"https://t.me/{MINI_BOT_USERNAME}?start=home")
+    ]])
+
+
+async def mini_webapp_keyboard(settings=None):
     settings = settings or await get_settings()
     url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
-    text = (settings.get("bot_menu_button_text") or DEFAULT_MENU_BUTTON_TEXT or "🎬 Video open").strip()
-    if not valid_webapp_url(url):
-        return None
-    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=text, web_app=WebAppInfo(url=url))]])
-
+    label = (settings.get("bot_menu_button_text") or DEFAULT_MENU_BUTTON_TEXT or "🎬 Video open").strip()[:64]
+    if valid_webapp_url(url):
+        return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))]])
+    return None
 
 async def delete_later(chat_id: int, message_id: int, minutes: int):
     await asyncio.sleep(max(1, minutes) * 60)
@@ -364,6 +397,31 @@ async def deliver_video_from_video_bot(message: Message, code: str):
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Video Bot-কে Storage Channel-এর Admin করুন।")
 
 
+@mini_dp.message(CommandStart())
+async def mini_bot_start_handler(message: Message):
+    await save_mini_bot_user(message)
+    settings = await get_settings()
+    if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
+        await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি Maintenance Mode-এ আছে।")
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    payload = parts[1].strip() if len(parts) > 1 else ""
+    welcome = settings.get("welcome_text") or "👋 স্বাগতম! নিচের বাটন থেকে Premium Video Gallery খুলুন।"
+    if payload.startswith("admin") and is_admin_id(message.from_user.id):
+        welcome = "🛠 Central Control Center প্রস্তুত। নিচের বাটন থেকে Admin Panel খুলুন।"
+    elif payload.startswith("welcome"):
+        welcome = settings.get("join_welcome_text") or welcome
+    kb = await mini_webapp_keyboard(settings)
+    await message.answer(welcome, reply_markup=kb)
+
+
+@mini_dp.message(F.chat.type == "private")
+async def mini_bot_private_handler(message: Message):
+    await save_mini_bot_user(message)
+    if (message.text or "").strip().lower() in {"menu", "app", "video", "ভিডিও"}:
+        await message.answer("🎬 Premium Video Gallery খুলুন", reply_markup=await mini_webapp_keyboard())
+
+
 @video_dp.message(CommandStart())
 async def video_bot_start_handler(message: Message):
     await save_video_bot_user(message)
@@ -372,8 +430,8 @@ async def video_bot_start_handler(message: Message):
     if payload.startswith("video_"):
         await deliver_video_from_video_bot(message, payload)
         return
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Main Video Bot খুলুন", url=f"https://t.me/{BOT_USERNAME}")]])
-    await message.answer("👋 এই Bot শুধু protected video delivery-এর জন্য।\n\nভিডিও খুঁজতে Main Bot/Mini App ব্যবহার করুন।", reply_markup=kb)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Main Video Bot খুলুন", url=f"https://t.me/{MINI_BOT_USERNAME}")]])
+    await message.answer("👋 এই Bot protected video delivery-এর জন্য।\n\nনতুন ভিডিও খুঁজতে Mini Bot খুলুন।", reply_markup=kb)
 
 
 @video_dp.message(F.chat.type == "private")
@@ -402,10 +460,9 @@ async def send_start_tutorial(message: Message, settings):
         return False
     kb = await webapp_keyboard(settings)
     if kb:
-        # Use tutorial-specific button label while keeping the configured web app URL.
-        url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
+        # Notification Bot must route to Mini Bot; Mini App initData is signed by Mini Bot.
         label = (settings.get("tutorial_button_text") or "🎬 ভিডিও দেখতে শুরু করুন").strip()[:64]
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))]])
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, url=f"https://t.me/{MINI_BOT_USERNAME}?start=home")]])
     caption = settings.get("tutorial_caption") or "🎓 ভিডিও কীভাবে দেখবেন"
     try:
         await bot.copy_message(
@@ -520,7 +577,7 @@ async def _notify_all_admins_new_video(*, code: str, deep_link: str, caption: st
 
     buttons = [[InlineKeyboardButton(text="🔗 Video Bot Link খুলুন", url=deep_link)]]
     if valid_webapp_url(web_url):
-        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel খুলুন", web_app=WebAppInfo(url=web_url))])
+        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel খুলুন", url=f"https://t.me/{MINI_BOT_USERNAME}?start=admin")])
     buttons.append([InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -562,11 +619,9 @@ async def welcome_keyboard(settings, chat_row=None, include_rejoin=False):
     app_url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
     video_text = (settings.get("welcome_video_button_text") or "🎬 ভিডিও ওপেন করুন").strip()[:64]
     start_text = (settings.get("welcome_start_button_text") or "🚀 Start Bot").strip()[:64]
-    if valid_webapp_url(app_url):
-        rows.append([InlineKeyboardButton(text=video_text, web_app=WebAppInfo(url=app_url))])
-    else:
-        rows.append([InlineKeyboardButton(text=video_text, url=f"https://t.me/{BOT_USERNAME}?start=welcome")])
-    rows.append([InlineKeyboardButton(text=start_text, url=f"https://t.me/{BOT_USERNAME}?start=welcome")])
+    mini_start = f"https://t.me/{MINI_BOT_USERNAME}?start=welcome"
+    rows.append([InlineKeyboardButton(text=video_text, url=mini_start)])
+    rows.append([InlineKeyboardButton(text=start_text, url=mini_start)])
     if include_rejoin and chat_row and chat_row.get("join_url"):
         rows.append([InlineKeyboardButton(text=(settings.get("welcome_rejoin_button_text") or "🔄 আবার Join করুন")[:64], url=chat_row["join_url"])])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -744,7 +799,7 @@ async def broadcast_worker():
             )
             for v in videos:
                 button_text = settings.get("broadcast_button_text") or "▶ ভিডিও ওপেন করুন"
-                target_url = v.get("share_link") or (f"https://t.me/{BOT_USERNAME}?startapp={v.get('share_code')}" if v.get('share_code') else None)
+                target_url = v.get("share_link") or (f"https://t.me/{MINI_BOT_USERNAME}?startapp={v.get('share_code')}" if v.get('share_code') else None)
                 if not target_url:
                     continue
                 kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=button_text, url=target_url)]])
@@ -794,7 +849,7 @@ def verify_init_data(init_data: str, max_age=86400):
         if not received_hash:
             return None
         data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
-        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        secret_key = hmac.new(b"WebAppData", MINI_BOT_TOKEN.encode(), hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(calculated_hash, received_hash):
             return None
@@ -832,7 +887,7 @@ async def index_handler(request):
 
 
 async def health_handler(request):
-    return web.json_response({"ok": True, "service": "viral-video-bot", "database": "postgresql", "main_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
+    return web.json_response({"ok": True, "service": "viral-video-bot-v18", "database": "postgresql", "mini_bot": MINI_BOT_USERNAME, "notification_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
 
 
 async def api_bootstrap(request):
@@ -844,7 +899,7 @@ async def api_bootstrap(request):
         videos = await db_fetchall("SELECT id,share_code,title,category_id,thumb,thumb_text,published,views,required_ads,featured,trending,created_at FROM videos WHERE published=TRUE ORDER BY created_at DESC")
     for v in videos:
         if v.get("share_code"):
-            v["share_link"] = f"https://t.me/{BOT_USERNAME}?startapp={v['share_code']}"
+            v["share_link"] = f"https://t.me/{MINI_BOT_USERNAME}?startapp={v['share_code']}"
 
     categories = await db_fetchall('SELECT id,name,icon,sort_order AS "order" FROM categories ORDER BY sort_order,id')
     viral = await db_fetchall("SELECT id,title,url FROM viral_links ORDER BY created_at DESC")
@@ -890,7 +945,9 @@ async def api_bootstrap(request):
         "my_reactions": my_reactions,
         "is_admin": is_admin,
         "stats": stats,
-        "bot_username": BOT_USERNAME if is_admin else None,
+        "bot_username": MINI_BOT_USERNAME,
+        "mini_bot_username": MINI_BOT_USERNAME,
+        "notification_bot_username": BOT_USERNAME if is_admin else None,
         "video_bot_username": VIDEO_BOT_USERNAME,
         "is_owner": bool(u and int(u.get("id",0)) == OWNER_ID),
         "admin_permissions": ADMIN_PERMS.get(int(u.get("id",0)), {}) if u and is_admin else {},
@@ -902,6 +959,12 @@ async def api_presence(request):
     u = request_user(request)
     if u:
         await db_execute(
+            """INSERT INTO mini_bot_users(user_id,username,first_name,last_name,is_active,last_seen_at)
+               VALUES(%s,%s,%s,%s,TRUE,%s)
+               ON CONFLICT (user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,is_active=TRUE,last_seen_at=EXCLUDED.last_seen_at""",
+            (int(u["id"]), u.get("username"), u.get("first_name"), u.get("last_name"), utcnow_sql()),
+        )
+        await db_execute(
             """INSERT INTO miniapp_presence(user_id,username,first_name,last_seen_at)
                VALUES(%s,%s,%s,%s)
                ON CONFLICT (user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,last_seen_at=EXCLUDED.last_seen_at""",
@@ -911,7 +974,9 @@ async def api_presence(request):
     today = (await db_fetchone("SELECT COUNT(*) c FROM miniapp_presence WHERE last_seen_at >= CURRENT_DATE"))["c"]
     payload = {"online": online, "today_active": today}
     if u and is_admin_id(int(u.get("id", 0))):
-        payload["total_users"] = (await db_fetchone("SELECT COUNT(*) c FROM bot_users"))["c"]
+        payload["total_users"] = (await db_fetchone("SELECT COUNT(*) c FROM mini_bot_users"))["c"]
+        payload["notification_users"] = (await db_fetchone("SELECT COUNT(*) c FROM bot_users"))["c"]
+        payload["video_users"] = (await db_fetchone("SELECT COUNT(*) c FROM video_bot_users"))["c"]
         payload["video_requests"] = (await db_fetchone("SELECT COUNT(*) c FROM video_requests"))["c"]
     return web.json_response(payload)
 
@@ -1139,7 +1204,7 @@ async def api_admin_video_save(request):
 
     existing = await db_fetchone("SELECT share_code,thumb,thumb_text,views,delivery_mode,short_url FROM videos WHERE id=%s", (d["id"],))
     share_code = str(d.get("share_code") or (existing or {}).get("share_code") or "").strip() or f"v{int(time.time() * 1000)}"
-    share_link = f"https://t.me/{BOT_USERNAME}?startapp={share_code}"
+    share_link = f"https://t.me/{MINI_BOT_USERNAME}?startapp={share_code}"
     settings = await get_settings()
     try:
         required_ads = max(0, min(10, int(d.get("required_ads", settings.get("required_ads_default", 1)) or 0)))
@@ -1301,7 +1366,8 @@ async def api_admin_users(request):
           COALESCE((SELECT COUNT(*) FROM ad_completions ac WHERE ac.user_id=u.user_id),0) AS ads_completed,
           (SELECT MAX(vr.created_at) FROM video_requests vr WHERE vr.user_id=u.user_id AND vr.delivered=TRUE) AS last_unlock_at,
           EXISTS(SELECT 1 FROM video_bot_users vb WHERE vb.user_id=u.user_id AND vb.is_active=TRUE) AS video_bot_started
-        FROM bot_users u ORDER BY u.last_seen_at DESC LIMIT 500
+        , EXISTS(SELECT 1 FROM bot_users nb WHERE nb.user_id=u.user_id AND nb.is_active=TRUE) AS notification_bot_started
+        FROM mini_bot_users u ORDER BY u.last_seen_at DESC LIMIT 500
     """)
     return web.Response(text=json.dumps({"users":rows}, default=str, ensure_ascii=False), content_type="application/json")
 
@@ -1309,7 +1375,7 @@ async def api_admin_users(request):
 async def api_admin_user_toggle(request):
     require_admin(request, "can_manage_users")
     uid=int(request.match_info["user_id"]); d=await json_body(request); active=bool(d.get("is_active",True))
-    await db_execute("UPDATE bot_users SET is_active=%s WHERE user_id=%s", (active,uid))
+    await db_execute("UPDATE mini_bot_users SET is_active=%s WHERE user_id=%s", (active,uid))
     return web.json_response({"ok":True})
 
 
@@ -1375,6 +1441,32 @@ async def api_admin_broadcast(request):
         except Exception: fail+=1
     await db_execute("INSERT INTO admin_broadcasts(created_by,message_type,text_content,media_url,button_text,button_url,sent_count,failed_count) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(int(u["id"]),typ,text,media,bt,bu,ok,fail))
     return web.json_response({"ok":True,"sent":ok,"failed":fail})
+
+
+async def api_admin_bot_status(request):
+    require_admin(request, "can_manage_settings")
+    async def info(client, role):
+        try:
+            me = await client.get_me()
+            return {"role": role, "ok": True, "id": me.id, "username": me.username, "name": me.full_name}
+        except Exception as e:
+            return {"role": role, "ok": False, "error": str(e)[:200]}
+    return web.json_response({
+        "mini": await info(mini_bot, "Mini App / Control"),
+        "notification": await info(bot, "Notification / Community"),
+        "video": await info(video_bot, "Video Delivery"),
+    })
+
+
+async def api_admin_bot_test(request):
+    u = require_admin(request, "can_manage_settings")
+    d = await json_body(request)
+    target = str(d.get("target") or "notification")
+    client = {"mini": mini_bot, "notification": bot, "video": video_bot}.get(target)
+    if not client:
+        raise web.HTTPBadRequest(text="Unknown bot target")
+    await client.send_message(int(u["id"]), f"✅ V18 {target.title()} Bot test successful")
+    return web.json_response({"ok": True})
 
 
 async def delete_queue_worker():
@@ -1448,6 +1540,8 @@ async def start_web_server():
     app.router.add_get("/api/admin/users", api_admin_users)
     app.router.add_post("/api/admin/users/{user_id}/toggle", api_admin_user_toggle)
     app.router.add_post("/api/admin/broadcast", api_admin_broadcast)
+    app.router.add_get("/api/admin/bot-status", api_admin_bot_status)
+    app.router.add_post("/api/admin/bot-test", api_admin_bot_test)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
@@ -1457,20 +1551,30 @@ async def start_web_server():
 
 
 async def main():
+    global MINI_BOT_USERNAME
     await init_db()
+    if not MINI_BOT_USERNAME:
+        try:
+            MINI_BOT_USERNAME = (await mini_bot.get_me()).username or ""
+        except Exception:
+            log.exception("Mini Bot username auto-detect failed")
+    if not MINI_BOT_USERNAME:
+        raise RuntimeError("MINI_BOT_USERNAME is missing and could not be auto-detected")
     await sync_menu_button(force_log=True)
     web_runner = await start_web_server()
     asyncio.create_task(broadcast_worker())
     asyncio.create_task(menu_sync_worker())
     asyncio.create_task(delete_queue_worker())
+    mini_poll = asyncio.create_task(mini_dp.start_polling(mini_bot, allowed_updates=["message"]))
     main_poll = asyncio.create_task(dp.start_polling(bot, allowed_updates=["message", "channel_post", "callback_query", "chat_join_request", "chat_member", "my_chat_member"]))
     video_poll = asyncio.create_task(video_dp.start_polling(video_bot, allowed_updates=["message"]))
     try:
-        await asyncio.gather(main_poll, video_poll)
+        await asyncio.gather(mini_poll, main_poll, video_poll)
     finally:
         await web_runner.cleanup()
         if db_pool:
             await db_pool.close()
+        await mini_bot.session.close()
         await bot.session.close()
         await video_bot.session.close()
 
