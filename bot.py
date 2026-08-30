@@ -21,6 +21,8 @@ from aiogram.types import (
     BotCommand,
     BufferedInputFile,
     CallbackQuery,
+    ChatJoinRequest,
+    ChatMemberUpdated,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
@@ -144,7 +146,7 @@ async def get_settings():
     try:
         row = await db_fetchone("SELECT * FROM app_settings WHERE id='main' LIMIT 1")
         if row:
-            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled"):
+            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"):
                 if key in row:
                     row[key] = bool(row[key])
             return row
@@ -170,6 +172,16 @@ async def get_settings():
         "comments_enabled": True, "reactions_enabled": True, "favorites_enabled": True, "profile_stats_enabled": True,
         "adsgram_enabled": True, "adsgram_block_id": "int-45179", "required_ads_default": 1,
         "ad_button_text": "📢 Ad দেখুন", "ad_unlock_text": "🔓 ভিডিও আনলক করুন",
+        "welcome_manager_enabled": True,
+        "join_request_welcome_enabled": True,
+        "direct_join_welcome_enabled": True,
+        "leave_inbox_enabled": True,
+        "auto_approve_join_requests": False,
+        "join_welcome_text": "👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।",
+        "leave_inbox_text": "😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।",
+        "welcome_video_button_text": "🎬 ভিডিও ওপেন করুন",
+        "welcome_start_button_text": "🚀 Start Bot",
+        "welcome_rejoin_button_text": "🔄 আবার Join করুন",
     }
 
 
@@ -534,6 +546,129 @@ async def _notify_all_admins_new_video(*, code: str, deep_link: str, caption: st
                 await bot.send_message(uid, note, parse_mode=ParseMode.HTML, reply_markup=kb)
         except Exception:
             log.exception("new video admin notification failed uid=%s", uid)
+
+
+
+async def get_managed_chat(chat_id: int):
+    try:
+        return await db_fetchone("SELECT * FROM managed_chats WHERE chat_id=%s AND enabled=TRUE LIMIT 1", (int(chat_id),))
+    except Exception:
+        log.exception("managed chat lookup failed chat=%s", chat_id)
+        return None
+
+
+async def welcome_keyboard(settings, chat_row=None, include_rejoin=False):
+    rows = []
+    app_url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
+    video_text = (settings.get("welcome_video_button_text") or "🎬 ভিডিও ওপেন করুন").strip()[:64]
+    start_text = (settings.get("welcome_start_button_text") or "🚀 Start Bot").strip()[:64]
+    if valid_webapp_url(app_url):
+        rows.append([InlineKeyboardButton(text=video_text, web_app=WebAppInfo(url=app_url))])
+    else:
+        rows.append([InlineKeyboardButton(text=video_text, url=f"https://t.me/{BOT_USERNAME}?start=welcome")])
+    rows.append([InlineKeyboardButton(text=start_text, url=f"https://t.me/{BOT_USERNAME}?start=welcome")])
+    if include_rejoin and chat_row and chat_row.get("join_url"):
+        rows.append([InlineKeyboardButton(text=(settings.get("welcome_rejoin_button_text") or "🔄 আবার Join করুন")[:64], url=chat_row["join_url"])])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def log_join_leave_event(chat_id, user_id, event_type, sent=False, error=None):
+    try:
+        await db_execute(
+            "INSERT INTO join_leave_events(chat_id,user_id,event_type,inbox_sent,error_text,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
+            (int(chat_id), int(user_id), event_type, bool(sent), (str(error)[:1000] if error else None), utcnow_sql()),
+        )
+    except Exception:
+        log.exception("join/leave event log failed")
+
+
+async def send_join_leave_inbox(target_chat_id: int, user_id: int, chat_row, event_type: str):
+    settings = await get_settings()
+    if not settings.get("welcome_manager_enabled", True):
+        return False
+    if event_type == "join_request" and (not settings.get("join_request_welcome_enabled", True) or chat_row.get("join_request_welcome") is False):
+        return False
+    if event_type == "join" and (not settings.get("direct_join_welcome_enabled", True) or chat_row.get("direct_join_welcome") is False):
+        return False
+    if event_type == "leave" and (not settings.get("leave_inbox_enabled", True) or chat_row.get("leave_welcome") is False):
+        return False
+    text = settings.get("leave_inbox_text") if event_type == "leave" else settings.get("join_welcome_text")
+    if not text:
+        text = "👋 স্বাগতম!" if event_type != "leave" else "😢 আপনি গ্রুপ/চ্যানেল থেকে বের হয়েছেন।"
+    try:
+        text = str(text).replace("{chat_title}", str(chat_row.get("title") or "আমাদের কমিউনিটি"))
+    except Exception:
+        pass
+    kb = await welcome_keyboard(settings, chat_row, include_rejoin=(event_type == "leave"))
+    try:
+        await bot.send_message(int(target_chat_id), text, reply_markup=kb)
+        await log_join_leave_event(chat_row["chat_id"], user_id, event_type, True, None)
+        return True
+    except Exception as e:
+        # For normal join/leave Telegram may reject the DM if the user never started the bot.
+        log.info("join/leave inbox not sent event=%s user=%s chat=%s error=%s", event_type, user_id, chat_row.get("chat_id"), e)
+        await log_join_leave_event(chat_row["chat_id"], user_id, event_type, False, e)
+        return False
+
+
+@dp.chat_join_request()
+async def join_request_handler(req: ChatJoinRequest):
+    chat_row = await get_managed_chat(req.chat.id)
+    if not chat_row:
+        return
+    settings = await get_settings()
+    # user_chat_id can be used for a short period while the join request is pending.
+    target_chat_id = int(getattr(req, "user_chat_id", 0) or req.from_user.id)
+    await send_join_leave_inbox(target_chat_id, req.from_user.id, chat_row, "join_request")
+    auto_approve = chat_row.get("auto_approve")
+    if auto_approve is None:
+        auto_approve = settings.get("auto_approve_join_requests", False)
+    if auto_approve:
+        try:
+            await bot.approve_chat_join_request(req.chat.id, req.from_user.id)
+        except Exception:
+            log.exception("auto approve join request failed chat=%s user=%s", req.chat.id, req.from_user.id)
+
+
+@dp.chat_member()
+async def chat_member_handler(event: ChatMemberUpdated):
+    user_obj = getattr(event.new_chat_member, "user", None)
+    if not user_obj or user_obj.is_bot:
+        return
+    chat_row = await get_managed_chat(event.chat.id)
+    if not chat_row:
+        return
+    old_status = getattr(getattr(event.old_chat_member, "status", None), "value", str(getattr(event.old_chat_member, "status", "")))
+    new_status = getattr(getattr(event.new_chat_member, "status", None), "value", str(getattr(event.new_chat_member, "status", "")))
+    active = {"member", "administrator", "creator", "restricted"}
+    if old_status in {"left", "kicked"} and new_status in active:
+        await send_join_leave_inbox(user_obj.id, user_obj.id, chat_row, "join")
+    elif old_status in active and new_status in {"left", "kicked"}:
+        await send_join_leave_inbox(user_obj.id, user_obj.id, chat_row, "leave")
+
+
+@dp.my_chat_member()
+async def my_chat_member_handler(event: ChatMemberUpdated):
+    new_status = getattr(getattr(event.new_chat_member, "status", None), "value", str(getattr(event.new_chat_member, "status", "")))
+    if new_status != "administrator":
+        return
+    try:
+        if int(event.chat.id) == int(await current_storage_channel_id()):
+            return
+    except Exception:
+        pass
+    title = getattr(event.chat, "title", None) or str(event.chat.id)
+    chat_type = getattr(getattr(event.chat, "type", None), "value", str(getattr(event.chat, "type", "group")))
+    try:
+        await db_execute(
+            """INSERT INTO managed_chats(chat_id,title,chat_type,enabled,created_at,updated_at)
+               VALUES(%s,%s,%s,TRUE,%s,%s)
+               ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title,chat_type=EXCLUDED.chat_type,updated_at=EXCLUDED.updated_at""",
+            (int(event.chat.id), title[:255], chat_type[:30], utcnow_sql(), utcnow_sql()),
+        )
+        await bot.send_message(OWNER_ID, f"✅ Welcome Manager chat detect করেছে\n\n{title}\n<code>{event.chat.id}</code>\n\nAdmin Panel → Join/Leave থেকে URL ও settings ঠিক করুন।", parse_mode=ParseMode.HTML)
+    except Exception:
+        log.exception("auto register managed chat failed")
 
 
 @dp.channel_post()
@@ -1085,9 +1220,11 @@ async def api_admin_settings_save(request):
         "tutorial_enabled", "tutorial_video_code", "tutorial_caption", "tutorial_button_text",
         "storage_channel_id", "maintenance_message", "support_url", "join_channel_url", "start_button_text",
         "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled",
-        "adsgram_enabled", "adsgram_block_id", "required_ads_default", "ad_button_text", "ad_unlock_text"
+        "adsgram_enabled", "adsgram_block_id", "required_ads_default", "ad_button_text", "ad_unlock_text",
+        "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests",
+        "join_welcome_text", "leave_inbox_text", "welcome_video_button_text", "welcome_start_button_text", "welcome_rejoin_button_text"
     ]
-    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled"}
+    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"}
 
     vals = []
     for f in fields:
@@ -1176,6 +1313,46 @@ async def api_admin_user_toggle(request):
     return web.json_response({"ok":True})
 
 
+
+async def api_admin_managed_chats(request):
+    require_admin(request, "can_manage_settings")
+    if request.method == "GET":
+        rows = await db_fetchall("SELECT * FROM managed_chats ORDER BY updated_at DESC, title")
+        return web.Response(text=json.dumps({"chats": rows}, default=str, ensure_ascii=False), content_type="application/json")
+    d = await json_body(request)
+    try:
+        chat_id = int(d.get("chat_id"))
+    except Exception:
+        raise web.HTTPBadRequest(text="Valid Chat ID required")
+    title = str(d.get("title") or chat_id)[:255]
+    join_url = str(d.get("join_url") or "").strip() or None
+    chat_type = str(d.get("chat_type") or "group")[:30]
+    await db_execute(
+        """INSERT INTO managed_chats(chat_id,title,chat_type,join_url,enabled,join_request_welcome,direct_join_welcome,leave_welcome,auto_approve,created_at,updated_at)
+           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+           ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title,chat_type=EXCLUDED.chat_type,join_url=EXCLUDED.join_url,enabled=EXCLUDED.enabled,
+           join_request_welcome=EXCLUDED.join_request_welcome,direct_join_welcome=EXCLUDED.direct_join_welcome,leave_welcome=EXCLUDED.leave_welcome,
+           auto_approve=EXCLUDED.auto_approve,updated_at=EXCLUDED.updated_at""",
+        (chat_id, title, chat_type, join_url, bool(d.get("enabled", True)), bool(d.get("join_request_welcome", True)), bool(d.get("direct_join_welcome", True)), bool(d.get("leave_welcome", True)), d.get("auto_approve"), utcnow_sql(), utcnow_sql()),
+    )
+    return web.json_response({"ok": True})
+
+
+async def api_admin_managed_chat_delete(request):
+    require_admin(request, "can_manage_settings")
+    await db_execute("DELETE FROM managed_chats WHERE chat_id=%s", (int(request.match_info["chat_id"]),))
+    return web.json_response({"ok": True})
+
+
+async def api_admin_join_leave_stats(request):
+    require_admin(request, "can_manage_settings")
+    total = (await db_fetchone("SELECT COUNT(*) c FROM join_leave_events"))["c"]
+    sent = (await db_fetchone("SELECT COUNT(*) c FROM join_leave_events WHERE inbox_sent=TRUE"))["c"]
+    joins = (await db_fetchone("SELECT COUNT(*) c FROM join_leave_events WHERE event_type IN ('join','join_request')"))["c"]
+    leaves = (await db_fetchone("SELECT COUNT(*) c FROM join_leave_events WHERE event_type='leave'"))["c"]
+    return web.json_response({"total": total, "sent": sent, "joins": joins, "leaves": leaves})
+
+
 async def api_admin_broadcast(request):
     u=require_admin(request, "can_broadcast"); d=await json_body(request)
     typ=str(d.get("message_type") or "text"); text=str(d.get("text") or "").strip(); media=str(d.get("media_url") or "").strip(); bt=str(d.get("button_text") or "").strip(); bu=str(d.get("button_url") or "").strip()
@@ -1261,6 +1438,10 @@ async def start_web_server():
     app.router.add_post("/api/admin/viral-links", api_admin_viral_save)
     app.router.add_delete("/api/admin/viral-links/{link_id}", api_admin_viral_delete)
     app.router.add_post("/api/admin/settings", api_admin_settings_save)
+    app.router.add_get("/api/admin/managed-chats", api_admin_managed_chats)
+    app.router.add_post("/api/admin/managed-chats", api_admin_managed_chats)
+    app.router.add_delete("/api/admin/managed-chats/{chat_id}", api_admin_managed_chat_delete)
+    app.router.add_get("/api/admin/join-leave-stats", api_admin_join_leave_stats)
     app.router.add_get("/api/admin/admins", api_admin_admins)
     app.router.add_post("/api/admin/admins", api_admin_admins)
     app.router.add_delete("/api/admin/admins/{user_id}", api_admin_admin_delete)
@@ -1282,7 +1463,7 @@ async def main():
     asyncio.create_task(broadcast_worker())
     asyncio.create_task(menu_sync_worker())
     asyncio.create_task(delete_queue_worker())
-    main_poll = asyncio.create_task(dp.start_polling(bot, allowed_updates=["message", "channel_post", "callback_query"]))
+    main_poll = asyncio.create_task(dp.start_polling(bot, allowed_updates=["message", "channel_post", "callback_query", "chat_join_request", "chat_member", "my_chat_member"]))
     video_poll = asyncio.create_task(video_dp.start_polling(video_bot, allowed_updates=["message"]))
     try:
         await asyncio.gather(main_poll, video_poll)
