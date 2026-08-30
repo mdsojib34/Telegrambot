@@ -351,6 +351,35 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 
 /* ===== V15 AUTO THUMBNAIL + CAPTION OVERLAY ===== */
 .thumb-caption-overlay{position:absolute;left:8px;right:8px;bottom:8px;z-index:5;padding:7px 9px;border-radius:11px;background:linear-gradient(90deg,rgba(4,7,15,.86),rgba(22,14,45,.78));border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(5px);font-size:10px;font-weight:900;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.thumb-caption-overlay span{background:linear-gradient(90deg,#ffffff 0%,#ffd166 48%,#ff78b7 100%);-webkit-background-clip:text;background-clip:text;color:transparent}.draft-card{background:linear-gradient(145deg,#151b2d,#0c1120);border:1px solid rgba(124,77,255,.2);border-radius:16px;padding:10px;margin:9px 0;display:grid;grid-template-columns:112px 1fr;gap:10px;align-items:center}.draft-thumb{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:11px;background:#060910}.draft-meta{min-width:0}.draft-meta b{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.draft-meta small{color:var(--muted);font-size:9px}.draft-use{margin-top:7px;width:auto!important;padding:7px 10px!important;font-size:10px!important}.thumb-preview-wrap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#05070d}.thumb-preview-wrap>img{width:100%;height:100%;object-fit:cover;object-position:center}.thumb-prev-text{position:absolute;left:8px;right:8px;bottom:8px;padding:7px 9px;border-radius:10px;background:rgba(7,10,19,.82);font-size:10px;font-weight:900;line-height:1.3}.thumb-prev-text span{background:linear-gradient(90deg,#fff,#ffd166,#ff78b7);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ===== V18 PREMIUM PHONE-GALLERY HOME ===== */
+#view-home{padding:0 14px 18px}
+#view-home .hero-card{margin:0 0 16px;border-radius:26px;padding:18px;background:linear-gradient(145deg,#22184d 0%,#5330bb 48%,#8a3ce0 100%);border:1px solid rgba(255,255,255,.10);box-shadow:0 22px 60px rgba(63,38,145,.34)}
+#view-home .hero-card h2{font-size:21px;font-weight:900;letter-spacing:-.2px}
+#view-home .hero-card p{font-size:11px;line-height:1.55;color:rgba(255,255,255,.78)}
+#main-grid.gallery-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.gallery-card{position:relative;background:linear-gradient(160deg,#151a2c,#0b101d);border:1px solid rgba(138,118,255,.18);border-radius:18px;overflow:hidden;min-width:0;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+.gallery-thumb{position:relative;aspect-ratio:9/12;background:#090c14;overflow:hidden;cursor:pointer}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-thumb:after{content:'';position:absolute;inset:auto 0 0;height:54%;background:linear-gradient(transparent,rgba(4,6,12,.92))}
+.gallery-play{position:absolute;inset:0;display:grid;place-items:center;z-index:2;pointer-events:none}
+.gallery-play span{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18);font-size:16px;padding-left:2px}
+.gallery-badges{position:absolute;left:8px;right:8px;top:8px;z-index:3;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.gallery-badge{font-size:8px;font-weight:900;padding:5px 7px;border-radius:999px;background:rgba(8,10,20,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);white-space:nowrap}
+.gallery-badge.hot{background:linear-gradient(135deg,#ff693d,#ff3f84);color:#fff;border:0}
+.gallery-body{padding:10px 10px 8px;min-width:0}
+.gallery-title{font-size:12px;font-weight:850;line-height:1.35;color:#fff;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}
+.gallery-desc{font-size:9px;color:#8f98b5;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-meta{display:flex;gap:8px;align-items:center;margin-top:7px;font-size:8px;color:#8e96b0}
+.gallery-actions{display:grid;grid-template-columns:1fr 38px;gap:6px;padding:0 9px 9px}
+.gallery-watch{border:0;border-radius:11px;background:linear-gradient(135deg,#6f4cff,#a33cff);color:#fff;font-size:10px;font-weight:900;padding:9px 7px;min-width:0}
+.gallery-share{border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#12182a;color:#fff;font-size:15px}
+@media(min-width:600px){#main-grid.gallery-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.gallery-thumb{aspect-ratio:4/5}}
+@media(min-width:900px){#main-grid.gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.bot-role-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.bot-role-card{background:linear-gradient(145deg,#141a2e,#0d1221);border:1px solid rgba(135,114,255,.18);border-radius:17px;padding:13px}
+.bot-role-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.bot-role-name{font-weight:900;font-size:13px}.bot-role-sub{font-size:9px;color:var(--muted);margin-top:3px}.bot-status-dot{width:9px;height:9px;border-radius:50%;background:#64748b}.bot-status-dot.ok{background:#20d889;box-shadow:0 0 12px rgba(32,216,137,.65)}
+
 </style>
 </head>
 <body>
@@ -398,8 +427,8 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 <section class="view active" id="view-home">
   <div class="hero-card" id="hero-banner">
     <div class="hero-topline"><span class="hero-badge" id="hero-badge">🔥 TRENDING NOW</span><span class="hero-badge"><span class="online-dot" style="display:inline-block;margin-right:6px"></span><span id="hero-online-count">1</span> LIVE</span></div>
-    <h2 id="hero-welcome">ভাইরাল ভিডিও হাবে স্বাগতম 👋</h2>
-    <p id="hero-subtitle">নতুন ও ট্রেন্ডিং ভিডিও খুঁজুন, পছন্দ করুন এবং নিরাপদভাবে আনলক করুন।</p>
+    <h2 id="hero-welcome">আপনার Premium Video Gallery 🎬</h2>
+    <p id="hero-subtitle">ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।</p>
     <div class="hero-stats">
       <div class="stat-pill"><b id="stat-total-v">0</b><span data-i18n="totalVideo">ভিডিও</span></div>
       <div class="stat-pill"><b id="stat-unlocked-v">0</b><span data-i18n="unlockedVideo">আনলক</span></div>
@@ -409,7 +438,7 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 
   <div id="home-content">
     <div class="section-head"><h3 id="grid-title">🔥 Trending Links</h3><span id="video-count-label">Latest videos</span></div>
-    <div class="grid" id="main-grid"></div>
+    <div class="grid gallery-grid" id="main-grid"></div>
   </div>
 </section>
 
@@ -469,6 +498,7 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
   <h3 class="page-title" data-i18n="adminPanel">🛠 অ্যাডমিন প্যানেল</h3>
   <div class="cat-tabs" style="padding:0;margin-bottom:15px">
     <button class="tab active" onclick="switchAdminSubView('dash', this)" data-i18n="dashboard">ড্যাশবোর্ড</button>
+    <button class="tab" onclick="switchAdminSubView('bots', this)">🤖 Bot Control</button>
     <button class="tab" onclick="switchAdminSubView('vids', this)" data-i18n="manageVideos">ভিডিও ম্যানেজ</button>
     <button class="tab" onclick="switchAdminSubView('cats', this)" data-i18n="manageCats">ক্যাটাগরি ম্যানেজ</button>
     <button class="tab" onclick="switchAdminSubView('viral', this)" data-i18n="manageViral">ভাইরাল লিংক</button>
@@ -491,6 +521,25 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
       <div class="dashboard-stat"><div class="label">📺 Ads Watched</div><div class="value" id="ad-stat-ads">0</div><div class="label" style="margin-top:4px">Today: <span id="ad-stat-ads-today">0</span></div></div>
       <div class="dashboard-stat"><div class="label">❤️ মোট Reaction</div><div class="value" id="ad-stat-reactions">0</div></div>
       <div class="dashboard-stat"><div class="label">💬 মোট Comment</div><div class="value" id="ad-stat-comments">0</div></div>
+    </div>
+  </div>
+
+
+  <div id="admin-bots" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>🤖 Three-Bot Central Control</h4>
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin:7px 0 13px">Mini Bot শুধু Mini App + Admin Control Center। Notification Bot package/broadcast/join-leave চালাবে। Video Bot protected video delivery করবে। সব control এই Mini App থেকেই হবে।</p>
+      <div id="bot-role-list" class="bot-role-grid"><div class="empty-state" style="padding:18px">Status load হচ্ছে...</div></div>
+      <button class="btn btn-g" style="margin-top:10px" onclick="loadBotControl()">🔄 Status Refresh</button>
+    </div>
+    <div class="admin-card">
+      <h4>🧪 Bot Test</h4>
+      <p style="font-size:10px;color:var(--muted);margin:7px 0 10px">Test চাপলে নির্বাচিত Bot আপনার Telegram inbox-এ একটি test message পাঠাবে।</p>
+      <div class="setting-grid">
+        <button class="btn btn-g" onclick="testBotRole('mini')">📱 Mini Bot Test</button>
+        <button class="btn btn-g" onclick="testBotRole('notification')">📢 Notification Test</button>
+        <button class="btn btn-g full" onclick="testBotRole('video')">🎥 Video Bot Test</button>
+      </div>
     </div>
   </div>
 
@@ -766,7 +815,7 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 <script>
 const ADMIN_ID = 0; // V8: admin authorization comes from the backend
 const STORE_KEY = "VidUnlock_Core_State_V7";
-const BOT_USERNAME = "Bangladesh_vairal_videobot";
+const BOT_USERNAME = "MiniVideoBot"; // runtime value comes from /api/bootstrap
 
 const API_BASE = '';
 let serverIsAdmin = false;
@@ -951,7 +1000,7 @@ function applyAppSettings(){
   const setText=(id,val)=>{const el=document.getElementById(id);if(el&&val)el.textContent=val};
   setText('brand-title', s.brand_name || 'Viral Video');
   setText('brand-subtitle', s.brand_subtitle || 'PREMIUM VIDEO HUB');
-  setText('hero-subtitle', s.hero_text || 'নতুন ও ট্রেন্ডিং ভিডিও খুঁজুন, পছন্দ করুন এবং নিরাপদভাবে আনলক করুন।');
+  setText('hero-subtitle', s.hero_text || 'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।');
   setText('online-label', s.online_label || 'Online');
   const nav = document.querySelectorAll('.bottom-nav .nav-item span');
   const labels=[s.nav_home||'হোম',s.nav_fav||'পছন্দ',s.nav_unlock||'আনলক',s.nav_viral||'ভাইরাল লিংক',s.nav_profile||'প্রোফাইল'];
@@ -1106,25 +1155,25 @@ function createVideoCard(v) {
   const viewsCount = Number(v.views || 0);
   const reacts = Number(v.reaction_count || 0);
   const comments = Number(v.comment_count || 0);
+  const reqAds = Number(v.required_ads || state.appSettings?.required_ads_default || 1);
   const catObj = state.categories.find(c => c.id === v.category_id || c.id === v.categoryId);
   const catName = catObj ? catObj.name : 'ভিডিও';
+  const desc = (v.thumb_text || '').trim() || `${catName} · Premium Video`;
   return `
-    <article class="card v8-video-card">
-      <div class="card-thumb" onclick="openDetail('${v.id}')">
-        <img src="${v.thumb || ''}" loading="lazy" onerror="this.style.opacity=.15">
-        <div class="v8-top-badges"><span class="v8-hot">🔥 HOT</span><span class="${isUnlocked?'badge-unlocked':'badge-locked'}">${isUnlocked?'🔓 OPEN':'🔒 LOCKED'}</span></div>
-        <div class="card-play"><div class="play-btn-circle">▶</div></div>
-        ${v.thumb_text ? `<div class="thumb-caption-overlay"><span>${escapeHtml(v.thumb_text)}</span></div>` : ''}
+    <article class="gallery-card">
+      <div class="gallery-thumb" onclick="openDetail('${v.id}')">
+        <img src="${v.thumb || ''}" loading="lazy" alt="${escapeHtml(v.title||'Video')}" onerror="this.style.opacity=.16">
+        <div class="gallery-badges"><span class="gallery-badge hot">${v.trending?'🔥 TRENDING':'🎬 NEW'}</span><span class="gallery-badge">${isUnlocked?'🔓 OPEN':'🔒 '+reqAds+' AD'}</span></div>
+        <div class="gallery-play"><span>▶</span></div>
       </div>
-      <div class="card-body" onclick="openDetail('${v.id}')">
-        <div class="card-cat">${catName}</div>
-        <div class="card-title">${escapeHtml(v.title)}</div>
-        <div class="v8-card-social"><span>👁 ${viewsCount}</span><span>❤️ ${reacts}</span><span>💬 ${comments}</span></div>
+      <div class="gallery-body" onclick="openDetail('${v.id}')">
+        <div class="gallery-title">${escapeHtml(v.title)}</div>
+        <div class="gallery-desc">${escapeHtml(desc)}</div>
+        <div class="gallery-meta"><span>👁 ${viewsCount}</span><span>❤️ ${reacts}</span><span>💬 ${comments}</span>${isFav?'<span>★</span>':''}</div>
       </div>
-      <div class="v8-card-actions">
-        <button class="v8-watch-btn" onclick="openDetail('${v.id}')"><span>▶</span> ভিডিও দেখুন</button>
-        <button class="v8-icon-btn" onclick="event.stopPropagation(); toggleFav('${v.id}')">${isFav ? '❤️' : '🤍'}</button>
-        <button class="v8-icon-btn" onclick="event.stopPropagation(); shareVideo('${v.id}')">↗</button>
+      <div class="gallery-actions">
+        <button class="gallery-watch" onclick="openDetail('${v.id}')">${isUnlocked?'▶ ভিডিও নিন':'🔐 আনলক করুন'}</button>
+        <button class="gallery-share" onclick="event.stopPropagation();shareVideo('${v.id}')">↗</button>
       </div>
     </article>`;
 }
@@ -1142,6 +1191,7 @@ function renderAll() {
 
 function renderHome() {
   const grid = document.getElementById('main-grid');
+  if(grid) grid.classList.add('gallery-grid');
   if(!grid) return;
   let vids = state.videos;
   if (currentCat !== 'cat_all') {
@@ -1579,7 +1629,7 @@ let settingsSaveInFlight = false;
 async function saveAdminSettings() {
   if(settingsSaveInFlight) return;
   const gv=id=>document.getElementById(id)?.value?.trim();
-  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'নতুন ও ট্রেন্ডিং ভিডিও খুঁজুন, পছন্দ করুন এবং নিরাপদভাবে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'▶ ভিডিও দেখুন',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন'};
+  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'▶ ভিডিও দেখুন',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন'};
   const btn=document.getElementById('settings-save-btn');
   settingsSaveInFlight=true;
   if(btn){btn.disabled=true;btn.textContent='⏳ সেভ হচ্ছে...';}
@@ -1604,7 +1654,7 @@ async function sendDirectBroadcast(){
   try{const r=await apiFetch('/api/admin/broadcast',{method:'POST',body:JSON.stringify(body)});document.getElementById('bc-result').textContent=`✅ Sent: ${r.sent} | ❌ Failed: ${r.failed}`;showToast('Broadcast complete ✅','success');}catch(e){showToast('Broadcast failed','danger');}
 }
 async function loadAdminUsers(){
-  try{const d=await apiFetch('/api/admin/users');const c=document.getElementById('admin-user-list');c.innerHTML=(d.users||[]).map(u=>`<div class="admin-list-item" style="flex-direction:column;align-items:stretch;gap:7px"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${u.first_name||'User'}</b><div style="font-size:10px;color:var(--muted)">@${u.username||'-'} · ${u.user_id}<br>${u.is_active?'🟢 Main Bot Active':'🔴 Main Bot Inactive'} · ${u.video_bot_started?'🎥 Video Bot Started':'⚪ Video Bot Not Started'}</div></div><button class="btn btn-g" style="width:auto;padding:6px 10px" onclick="toggleBotUser('${u.user_id}',${!u.is_active})">${u.is_active?'Disable':'Enable'}</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:9px"><span>👁 ${u.opened_total||0}</span><span>🔓 ${u.unlocked||0}</span><span>📢 ${u.ads_completed||0}</span><span>🎬 ${u.opened_unique||0}</span></div>${u.last_unlock_at?`<div style="font-size:9px;color:var(--muted)">Last unlock: ${u.last_unlock_at}</div>`:''}</div>`).join('')||'<div class="empty-state">No users</div>';}catch(e){showToast('Users load failed','danger');}
+  try{const d=await apiFetch('/api/admin/users');const c=document.getElementById('admin-user-list');c.innerHTML=(d.users||[]).map(u=>`<div class="admin-list-item" style="flex-direction:column;align-items:stretch;gap:7px"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${u.first_name||'User'}</b><div style="font-size:10px;color:var(--muted)">@${u.username||'-'} · ${u.user_id}<br>${u.is_active?'🟢 Mini Bot Active':'🔴 Mini Bot Inactive'} · ${u.notification_bot_started?'📢 Notify Bot Started':'⚪ Notify Bot Not Started'} · ${u.video_bot_started?'🎥 Video Bot Started':'⚪ Video Bot Not Started'}</div></div><button class="btn btn-g" style="width:auto;padding:6px 10px" onclick="toggleBotUser('${u.user_id}',${!u.is_active})">${u.is_active?'Disable':'Enable'}</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:9px"><span>👁 ${u.opened_total||0}</span><span>🔓 ${u.unlocked||0}</span><span>📢 ${u.ads_completed||0}</span><span>🎬 ${u.opened_unique||0}</span></div>${u.last_unlock_at?`<div style="font-size:9px;color:var(--muted)">Last unlock: ${u.last_unlock_at}</div>`:''}</div>`).join('')||'<div class="empty-state">No users</div>';}catch(e){showToast('Users load failed','danger');}
 }
 async function toggleBotUser(id,active){try{await apiFetch('/api/admin/users/'+id+'/toggle',{method:'POST',body:JSON.stringify({is_active:active})});loadAdminUsers();}catch(e){showToast('Update failed','danger');}}
 async function loadAdmins(){
@@ -1618,6 +1668,19 @@ async function saveAdminUser(){
 }
 async function removeAdmin(id){if(!confirm('Admin remove করবেন?'))return;try{await apiFetch('/api/admin/admins/'+id,{method:'DELETE'});loadAdmins();}catch(e){showToast('Remove failed','danger');}}
 
+
+async function loadBotControl(){
+  try{
+    const d=await apiFetch('/api/admin/bot-status');
+    const roles=[['mini','📱 Mini Bot','Mini App + Central Control'],['notification','📢 Notification Bot','Package + Broadcast + Join/Leave'],['video','🎥 Video Bot','Protected Video Delivery']];
+    const c=document.getElementById('bot-role-list');
+    c.innerHTML=roles.map(([k,name,sub])=>{const x=d[k]||{};return `<div class="bot-role-card"><div class="bot-role-top"><div><div class="bot-role-name">${name}</div><div class="bot-role-sub">${sub}</div></div><span class="bot-status-dot ${x.ok?'ok':''}"></span></div><div style="font-size:10px;color:var(--muted);margin-top:9px">${x.ok?`@${escapeHtml(x.username||'-')} · ID ${x.id}`:`❌ ${escapeHtml(x.error||'Offline')}`}</div></div>`}).join('');
+  }catch(e){showToast('Bot status load হয়নি: '+(e.message||''),'danger');}
+}
+async function testBotRole(target){
+  try{await apiFetch('/api/admin/bot-test',{method:'POST',body:JSON.stringify({target})});showToast(target+' Bot test sent ✅','success');}
+  catch(e){showToast('Test failed: '+(e.message||''),'danger');}
+}
 
 function clearManagedChatForm(){
   ['jl-chat-id','jl-chat-title','jl-join-url'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
@@ -1650,6 +1713,7 @@ function switchAdminSubView(id, btn) {
   document.querySelectorAll('.admin-subview').forEach(v => v.classList.add('hidden'));
   const subview = document.getElementById('admin-' + id);
   if(subview) subview.classList.remove('hidden');
+  if(id==='bots') loadBotControl();
   if(id==='vids') loadAutoDrafts();
   if(id==='users') loadAdminUsers();
   if(id==='admins') loadAdmins();
