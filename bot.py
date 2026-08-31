@@ -154,7 +154,7 @@ async def get_settings():
     try:
         row = await db_fetchone("SELECT * FROM app_settings WHERE id='main' LIMIT 1")
         if row:
-            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"):
+            for key in ("protect_content", "maintenance_mode", "show_online", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests", "welcome_video_button_enabled", "welcome_start_button_enabled", "welcome_rejoin_button_enabled"):
                 if key in row:
                     row[key] = bool(row[key])
             return row
@@ -190,8 +190,14 @@ async def get_settings():
         "join_welcome_text": "👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।",
         "leave_inbox_text": "😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।",
         "welcome_video_button_text": "🎬 ভিডিও ওপেন করুন",
+        "welcome_video_button_url": None,
+        "welcome_video_button_enabled": True,
         "welcome_start_button_text": "🚀 Start Bot",
+        "welcome_start_button_url": None,
+        "welcome_start_button_enabled": True,
         "welcome_rejoin_button_text": "🔄 আবার Join করুন",
+        "welcome_rejoin_button_url": None,
+        "welcome_rejoin_button_enabled": True,
     }
 
 
@@ -616,17 +622,49 @@ async def get_managed_chat(chat_id: int):
         return None
 
 
+def _normalize_button_url(value, fallback=None):
+    """Normalize an Admin-entered Telegram/HTTP button URL.
+
+    Empty values use the supplied fallback. A bare t.me/... value is upgraded to
+    https:// automatically so Admins do not need to remember the scheme.
+    """
+    value = str(value or "").strip()
+    if not value:
+        value = str(fallback or "").strip()
+    if not value:
+        return None
+    if value.startswith("t.me/") or value.startswith("www.t.me/"):
+        value = "https://" + value
+    if value.startswith(("https://", "http://", "tg://")):
+        return value
+    return None
+
+
 async def welcome_keyboard(settings, chat_row=None, include_rejoin=False):
     rows = []
-    app_url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
-    video_text = (settings.get("welcome_video_button_text") or "🎬 ভিডিও ওপেন করুন").strip()[:64]
-    start_text = (settings.get("welcome_start_button_text") or "🚀 Start Bot").strip()[:64]
-    mini_start = f"https://t.me/{MINI_BOT_USERNAME}?start=welcome"
-    rows.append([InlineKeyboardButton(text=video_text, url=mini_start)])
-    rows.append([InlineKeyboardButton(text=start_text, url=mini_start)])
-    if include_rejoin and chat_row and chat_row.get("join_url"):
-        rows.append([InlineKeyboardButton(text=(settings.get("welcome_rejoin_button_text") or "🔄 আবার Join করুন")[:64], url=chat_row["join_url"])])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    default_mini_start = f"https://t.me/{MINI_BOT_USERNAME}?start=welcome"
+
+    if settings.get("welcome_video_button_enabled", True):
+        video_text = (settings.get("welcome_video_button_text") or "🎬 ভিডিও ওপেন করুন").strip()[:64]
+        video_url = _normalize_button_url(settings.get("welcome_video_button_url"), default_mini_start)
+        if video_url:
+            rows.append([InlineKeyboardButton(text=video_text, url=video_url)])
+
+    if settings.get("welcome_start_button_enabled", True):
+        start_text = (settings.get("welcome_start_button_text") or "🚀 Start Bot").strip()[:64]
+        start_url = _normalize_button_url(settings.get("welcome_start_button_url"), default_mini_start)
+        if start_url:
+            rows.append([InlineKeyboardButton(text=start_text, url=start_url)])
+
+    if include_rejoin and settings.get("welcome_rejoin_button_enabled", True):
+        rejoin_text = (settings.get("welcome_rejoin_button_text") or "🔄 আবার Join করুন").strip()[:64]
+        # Global Admin URL wins; if blank, use this managed chat's Join/Invite URL.
+        chat_join_url = (chat_row or {}).get("join_url") if chat_row else None
+        rejoin_url = _normalize_button_url(settings.get("welcome_rejoin_button_url"), chat_join_url)
+        if rejoin_url:
+            rows.append([InlineKeyboardButton(text=rejoin_text, url=rejoin_url)])
+
+    return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 
 async def log_join_leave_event(chat_id, user_id, event_type, sent=False, error=None):
@@ -1279,9 +1317,12 @@ async def api_admin_settings_save(request):
         "adsgram_enabled", "adsgram_block_id", "required_ads_default", "ad_button_text", "ad_unlock_text",
         "monetization_mode", "monetag_enabled", "monetag_zone_id", "monetag_required_default", "monetag_button_text", "monetag_wait_seconds",
         "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests",
-        "join_welcome_text", "leave_inbox_text", "welcome_video_button_text", "welcome_start_button_text", "welcome_rejoin_button_text"
+        "join_welcome_text", "leave_inbox_text",
+        "welcome_video_button_text", "welcome_video_button_url", "welcome_video_button_enabled",
+        "welcome_start_button_text", "welcome_start_button_url", "welcome_start_button_enabled",
+        "welcome_rejoin_button_text", "welcome_rejoin_button_url", "welcome_rejoin_button_enabled"
     ]
-    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests"}
+    bool_fields = {"show_online", "protect_content", "maintenance_mode", "tutorial_enabled", "comments_enabled", "reactions_enabled", "favorites_enabled", "profile_stats_enabled", "adsgram_enabled", "monetag_enabled", "welcome_manager_enabled", "join_request_welcome_enabled", "direct_join_welcome_enabled", "leave_inbox_enabled", "auto_approve_join_requests", "welcome_video_button_enabled", "welcome_start_button_enabled", "welcome_rejoin_button_enabled"}
 
     vals = []
     for f in fields:
