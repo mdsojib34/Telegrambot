@@ -325,3 +325,15 @@ ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_button_text VARCHAR(10
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS monetag_wait_seconds INTEGER DEFAULT 20;
 ALTER TABLE ad_sessions ADD COLUMN IF NOT EXISTS provider VARCHAR(40) DEFAULT 'adsgram';
 CREATE INDEX IF NOT EXISTS idx_ad_completions_provider ON ad_completions(provider, created_at DESC);
+
+
+-- =========================================================
+-- V19.3 Welcome Button URL Control
+-- Admin Panel: Text + URL + ON/OFF for Video / Start / Rejoin
+-- =========================================================
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_video_button_url TEXT;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_video_button_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_start_button_url TEXT;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_start_button_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_rejoin_button_url TEXT;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_rejoin_button_enabled BOOLEAN DEFAULT TRUE;
