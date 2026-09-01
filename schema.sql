@@ -337,3 +337,142 @@ ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_start_button_url TEXT;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_start_button_enabled BOOLEAN DEFAULT TRUE;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_rejoin_button_url TEXT;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS welcome_rejoin_button_enabled BOOLEAN DEFAULT TRUE;
+
+-- ============================================================
+-- V20 FULL UPDATE - additive/idempotent migration
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tutorial_settings (
+  id VARCHAR(32) PRIMARY KEY DEFAULT 'main',
+  enabled BOOLEAN DEFAULT TRUE,
+  video_code VARCHAR(100),
+  title VARCHAR(255) DEFAULT 'ভিডিও দেখার নিয়ম',
+  description TEXT DEFAULT 'ভিডিওটি দেখে নিয়ম বুঝে নিন, তারপর Home Page খুলুন।',
+  button_text VARCHAR(100) DEFAULT '🏠 Home Page',
+  updated_by BIGINT,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO tutorial_settings(id) VALUES('main') ON CONFLICT(id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS tutorial_views (
+  user_id BIGINT PRIMARY KEY,
+  viewed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wallet (
+  user_id BIGINT PRIMARY KEY,
+  balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+  total_earn NUMERIC(14,2) NOT NULL DEFAULT 0,
+  total_withdraw NUMERIC(14,2) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  type VARCHAR(40) NOT NULL,
+  amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+  reference_type VARCHAR(40),
+  reference_id VARCHAR(120),
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_transactions_reward_ref ON transactions(user_id,type,reference_type,reference_id) WHERE reference_id IS NOT NULL AND type='credit';
+
+CREATE TABLE IF NOT EXISTS withdraw_requests (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  amount NUMERIC(14,2) NOT NULL,
+  payment_method VARCHAR(30) NOT NULL,
+  account_number VARCHAR(50) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  admin_note TEXT,
+  reviewed_by BIGINT,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id BIGSERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  task_type VARCHAR(20) NOT NULL DEFAULT 'link',
+  reward_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+  task_link TEXT,
+  enabled BOOLEAN DEFAULT TRUE,
+  created_by BIGINT,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS task_completions (
+  user_id BIGINT NOT NULL,
+  task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  rewarded BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(user_id,task_id)
+);
+
+CREATE TABLE IF NOT EXISTS notification_channels (
+  id BIGSERIAL PRIMARY KEY,
+  chat_id BIGINT NOT NULL UNIQUE,
+  title VARCHAR(255),
+  enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS admin_permissions (
+  user_id BIGINT PRIMARY KEY,
+  package_control BOOLEAN DEFAULT FALSE,
+  withdraw_control BOOLEAN DEFAULT FALSE,
+  support_control BOOLEAN DEFAULT FALSE,
+  task_control BOOLEAN DEFAULT FALSE,
+  notification_control BOOLEAN DEFAULT FALSE,
+  analytics_control BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS video_buttons (
+  id VARCHAR(32) PRIMARY KEY DEFAULT 'main',
+  custom_message TEXT DEFAULT 'আশা করি আমাদের ভিডিও ভালো লাগছে ❤️\nআরও নতুন ভিডিও পেতে আমাদের সাথে থাকুন।',
+  button1_name VARCHAR(100), button1_url TEXT, button1_enabled BOOLEAN DEFAULT FALSE,
+  button2_name VARCHAR(100), button2_url TEXT, button2_enabled BOOLEAN DEFAULT FALSE,
+  deleted_message TEXT DEFAULT 'ভিডিওটি ডিলিট হয়ে গেছে ❌\n\nআবার দেখতে চাইলে আমাদের সাথে থাকুন\nভাইরাল ভিডিও ❤️',
+  deleted_button1_name VARCHAR(100), deleted_button1_url TEXT, deleted_button1_enabled BOOLEAN DEFAULT FALSE,
+  deleted_button2_name VARCHAR(100), deleted_button2_url TEXT, deleted_button2_enabled BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO video_buttons(id) VALUES('main') ON CONFLICT(id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS ad_settings (
+  id VARCHAR(32) PRIMARY KEY DEFAULT 'main',
+  mode VARCHAR(20) DEFAULT 'both',
+  adsgram_enabled BOOLEAN DEFAULT TRUE,
+  adsgram_block_id VARCHAR(100),
+  adsgram_required INTEGER DEFAULT 1,
+  adsgram_reward_mode BOOLEAN DEFAULT TRUE,
+  monetag_enabled BOOLEAN DEFAULT TRUE,
+  monetag_zone_id VARCHAR(100),
+  monetag_smart_link TEXT,
+  monetag_script_api TEXT,
+  monetag_wait_seconds INTEGER DEFAULT 20,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO ad_settings(id) VALUES('main') ON CONFLICT(id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS wallet_settings (
+  id VARCHAR(32) PRIMARY KEY DEFAULT 'main',
+  per_video_reward NUMERIC(14,2) DEFAULT 0,
+  daily_reward_limit NUMERIC(14,2) DEFAULT 0,
+  minimum_withdraw NUMERIC(14,2) DEFAULT 100,
+  maximum_withdraw NUMERIC(14,2) DEFAULT 10000,
+  withdraw_enabled BOOLEAN DEFAULT TRUE,
+  payment_methods TEXT DEFAULT 'bKash,Nagad',
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO wallet_settings(id) VALUES('main') ON CONFLICT(id) DO NOTHING;
+
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_manage_packages BOOLEAN DEFAULT TRUE;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_manage_withdraw BOOLEAN DEFAULT FALSE;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_manage_support BOOLEAN DEFAULT FALSE;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_manage_tasks BOOLEAN DEFAULT FALSE;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_manage_notifications BOOLEAN DEFAULT FALSE;
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS can_view_analytics BOOLEAN DEFAULT TRUE;
