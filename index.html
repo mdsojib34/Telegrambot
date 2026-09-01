@@ -416,6 +416,8 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 #comments-section-anchor{margin-top:24px!important;padding-top:20px!important}#md-comment-input{background:#0d172b!important;border-color:rgba(128,108,226,.2)!important;border-radius:15px!important;padding:13px 14px!important}
 @media(max-width:380px){.v192-provider{grid-template-columns:1fr}.v192-provider .btn{width:100%}.v192-title-wrap h2{font-size:18px!important}}
 
+
+.v20-wallet-card{margin:12px 0;padding:16px;border-radius:20px;background:linear-gradient(145deg,#181d34,#24183d);border:1px solid rgba(160,130,255,.24);box-shadow:var(--shadow-card)}.v20-wallet-balance{font-size:28px;font-weight:800;margin:4px 0}.v20-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-mini{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px}.v20-mini b{display:block;font-size:16px}.v20-admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-admin-grid .full{grid-column:1/-1}.v20-list{display:grid;gap:8px;margin-top:10px}.v20-list-item{padding:11px;border-radius:13px;background:var(--surface-2);border:1px solid rgba(255,255,255,.06)}
 </style>
 </head>
 <body>
@@ -472,6 +474,13 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
     </div>
   </div>
 
+  <div class="v20-wallet-card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div><div style="font-size:10px;color:var(--muted)">💎 Premium Balance</div><div class="v20-wallet-balance" id="home-v20-balance">৳0.00</div></div>
+      <button class="btn btn-g" style="width:auto;padding:9px 12px" onclick="showView('profile')">👤 My Profile</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span id="home-v20-user">@user</span><span><b id="home-v20-watch">0</b> watched</span></div>
+  </div>
   <div id="home-content">
     <div class="section-head"><h3 id="grid-title">🔥 Trending Links</h3><span id="video-count-label">Latest videos</span></div>
     <div class="grid gallery-grid" id="main-grid"></div>
@@ -521,6 +530,25 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
       <div><b id="prof-ad-tasks">0</b><span>Ad Complete</span></div>
       <div><b id="prof-unique">0</b><span>ইউনিক ভিডিও</span></div>
     </div>
+    <div style="text-align:center;font-size:10px;color:var(--muted);margin:-4px 0 8px">Join Date: <span id="prof-join-date">—</span></div>
+    <div class="v20-wallet-card">
+      <div style="font-size:11px;color:var(--muted)">💰 Premium Balance</div>
+      <div class="v20-wallet-balance" id="v20-balance">৳0.00</div>
+      <div class="v20-grid">
+        <div class="v20-mini"><b id="v20-watched">0</b><span>Total Video Watched</span></div>
+        <div class="v20-mini"><b id="v20-unlocks">0</b><span>Total Video Unlock</span></div>
+        <div class="v20-mini"><b id="v20-earned">৳0.00</b><span>Total Earn</span></div>
+        <div class="v20-mini"><b id="v20-withdrawn">৳0.00</b><span>Total Withdraw</span></div>
+      </div>
+      <div class="setting-grid" style="margin-top:12px">
+        <div class="form-group"><label>Withdraw Amount</label><input id="v20-wd-amount" type="number" min="0" step="0.01"></div>
+        <div class="form-group"><label>Payment Method</label><select id="v20-wd-method"><option>bKash</option><option>Nagad</option></select></div>
+        <div class="form-group full"><label>Number</label><input id="v20-wd-number" placeholder="01XXXXXXXXX"></div>
+      </div>
+      <button class="btn btn-p" onclick="submitV20Withdraw()">Submit Withdraw Request</button>
+      <div id="v20-withdraw-history" class="v20-list"></div>
+    </div>
+    <div class="admin-card" style="margin-top:12px"><h4>🎯 Available Tasks</h4><div id="v20-user-tasks" class="v20-list"></div></div>
     <div class="profile-menu-card">
       <button class="profile-menu-item" onclick="showView('fav')"><div class="profile-menu-left"><div class="profile-menu-icon">❤️</div><span>আমার পছন্দ</span></div><div class="profile-menu-arrow">›</div></button>
       <button class="profile-menu-item" onclick="showView('unlock')"><div class="profile-menu-left"><div class="profile-menu-icon">🔓</div><span>আমার আনলক ভিডিও</span></div><div class="profile-menu-arrow">›</div></button>
@@ -533,15 +561,22 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 <section class="view" id="view-admin">
   <h3 class="page-title" data-i18n="adminPanel">🛠 অ্যাডমিন প্যানেল</h3>
   <div class="cat-tabs" style="padding:0;margin-bottom:15px">
-    <button class="tab active" onclick="switchAdminSubView('dash', this)" data-i18n="dashboard">ড্যাশবোর্ড</button>
-    <button class="tab" onclick="switchAdminSubView('bots', this)">🤖 Bot Control</button>
-    <button class="tab" onclick="switchAdminSubView('vids', this)" data-i18n="manageVideos">ভিডিও ম্যানেজ</button>
+    <button class="tab active" onclick="switchAdminSubView('dash', this)" data-i18n="dashboard">📊 Analytics</button>
+    <button class="tab" onclick="switchAdminSubView('bots', this)">🤖 Bot Settings</button>
+    <button class="tab" onclick="switchAdminSubView('vids', this)" data-i18n="manageVideos">📦 Package Settings</button>
     <button class="tab" onclick="switchAdminSubView('cats', this)" data-i18n="manageCats">ক্যাটাগরি ম্যানেজ</button>
     <button class="tab" onclick="switchAdminSubView('viral', this)" data-i18n="manageViral">ভাইরাল লিংক</button>
     <button class="tab" onclick="switchAdminSubView('broadcast', this)">📢 Broadcast</button>
     <button class="tab" onclick="switchAdminSubView('users', this)">👥 Users</button>
-    <button class="tab" id="admin-admins-tab" onclick="switchAdminSubView('admins', this)">👑 Admins</button>
+    <button class="tab" id="admin-admins-tab" onclick="switchAdminSubView('admins', this)">👑 Admin Permission</button>
     <button class="tab" onclick="switchAdminSubView('joinleave', this)">👋 Join/Leave</button>
+    <button class="tab" onclick="switchAdminSubView('v20video', this)">🎬 Video Settings</button>
+    <button class="tab" id="v20-tutorial-tab" onclick="switchAdminSubView('v20tutorial', this)">🎓 Tutorial Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20ads', this)">📢 Ads Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20wallet', this)">💰 Wallet Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20tasks', this)">🎯 Task Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20notify', this)">🔔 Notification Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20withdraw', this)">💸 Withdraw Requests</button>
     <button class="tab" onclick="switchAdminSubView('settings', this)" data-i18n="settings">সেটিংস</button>
   </div>
   
@@ -667,6 +702,12 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
         <label><input type="checkbox" id="perm-broadcast" checked> Broadcast</label>
         <label><input type="checkbox" id="perm-users" checked> Users</label>
         <label><input type="checkbox" id="perm-admins"> Manage Admins</label>
+        <label><input type="checkbox" id="perm-packages" checked> Package Control</label>
+        <label><input type="checkbox" id="perm-withdraw"> Withdraw Control</label>
+        <label><input type="checkbox" id="perm-support"> User Support</label>
+        <label><input type="checkbox" id="perm-tasks"> Task Control</label>
+        <label><input type="checkbox" id="perm-notify"> Notification Control</label>
+        <label><input type="checkbox" id="perm-analytics" checked> Analytics</label>
       </div>
       <button class="btn btn-p" onclick="saveAdminUser()">➕ Admin যোগ/আপডেট করুন</button>
     </div>
@@ -703,6 +744,13 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
     <div id="managed-chat-list"></div>
   </div>
 
+  <div id="admin-v20video" class="admin-subview hidden"><div class="admin-card"><h4>🎬 Video Bot Advanced Message</h4><div class="setting-grid"><div class="form-group full"><label>Custom Message</label><textarea id="v20-vmsg" rows="4"></textarea></div><div class="form-group"><label>Button 1 Name</label><input id="v20-b1n"></div><div class="form-group"><label>Button 1 URL</label><input id="v20-b1u"></div><label><input type="checkbox" id="v20-b1e"> Button 1 ON</label><div></div><div class="form-group"><label>Button 2 Name</label><input id="v20-b2n"></div><div class="form-group"><label>Button 2 URL</label><input id="v20-b2u"></div><label><input type="checkbox" id="v20-b2e"> Button 2 ON</label><div></div><div class="form-group full"><label>Deleted Video Message</label><textarea id="v20-dmsg" rows="4"></textarea></div><div class="form-group"><label>Deleted Button 1 Name</label><input id="v20-db1n"></div><div class="form-group"><label>Deleted Button 1 URL</label><input id="v20-db1u"></div><label><input type="checkbox" id="v20-db1e"> Deleted Button 1 ON</label><div></div><div class="form-group"><label>Deleted Button 2 Name</label><input id="v20-db2n"></div><div class="form-group"><label>Deleted Button 2 URL</label><input id="v20-db2u"></div><label><input type="checkbox" id="v20-db2e"> Deleted Button 2 ON</label></div><button class="btn btn-p" onclick="saveV20Buttons()">Save Video Settings</button></div></div>
+  <div id="admin-v20tutorial" class="admin-subview hidden"><div class="admin-card"><h4>🎓 Owner Tutorial Settings</h4><p style="font-size:10px;color:var(--muted)">Owner only. Tutorial first /start-এ একবার দেখানো হবে।</p><div class="setting-grid"><label><input type="checkbox" id="v20-t-enabled"> Enable Tutorial</label><div></div><div class="form-group full"><label>Tutorial Video Code</label><input id="v20-t-code" placeholder="video_145"></div><div class="form-group full"><label>Title</label><input id="v20-t-title"></div><div class="form-group full"><label>Description</label><textarea id="v20-t-desc" rows="4"></textarea></div><div class="form-group full"><label>Home Button Text</label><input id="v20-t-btn"></div></div><button class="btn btn-p" onclick="saveV20Tutorial()">Save Tutorial</button><button class="btn btn-d" style="margin-top:8px" onclick="deleteV20Tutorial()">Delete Tutorial Video</button></div></div>
+  <div id="admin-v20ads" class="admin-subview hidden"><div class="admin-card"><h4>📢 AdsGram + Monetag</h4><div class="setting-grid"><div class="form-group full"><label>Ads Mode</label><select id="v20-ad-mode"><option value="adsgram">AdsGram Only</option><option value="monetag">Monetag Only</option><option value="both">Both</option><option value="off">Ads Disable</option></select></div><label><input type="checkbox" id="v20-ag-enabled"> AdsGram ON</label><label><input type="checkbox" id="v20-ag-reward"> Reward Mode</label><div class="form-group"><label>Block ID</label><input id="v20-ag-block"></div><div class="form-group"><label>Required Ads</label><input id="v20-ag-required" type="number"></div><label><input type="checkbox" id="v20-mo-enabled"> Monetag ON</label><div></div><div class="form-group"><label>Zone ID</label><input id="v20-mo-zone"></div><div class="form-group"><label>Wait Time</label><input id="v20-mo-wait" type="number"></div><div class="form-group full"><label>Smart Link</label><input id="v20-mo-link"></div><div class="form-group full"><label>Script/API</label><textarea id="v20-mo-script" rows="3"></textarea></div></div><button class="btn btn-p" onclick="saveV20Ads()">Save Ads Settings</button></div></div>
+  <div id="admin-v20wallet" class="admin-subview hidden"><div class="admin-card"><h4>💰 Wallet Settings</h4><div class="setting-grid"><div class="form-group"><label>Per Video Reward</label><input id="v20-w-reward" type="number" step="0.01"></div><div class="form-group"><label>Daily Reward Limit</label><input id="v20-w-daily" type="number" step="0.01"></div><div class="form-group"><label>Minimum Withdraw</label><input id="v20-w-min" type="number" step="0.01"></div><div class="form-group"><label>Maximum Withdraw</label><input id="v20-w-max" type="number" step="0.01"></div><label><input type="checkbox" id="v20-w-enabled"> Withdraw ON</label><div class="form-group"><label>Payment Methods</label><input id="v20-w-methods" value="bKash,Nagad"></div></div><button class="btn btn-p" onclick="saveV20WalletSettings()">Save Wallet Settings</button></div></div>
+  <div id="admin-v20tasks" class="admin-subview hidden"><div class="admin-card"><h4>🎯 Task Management</h4><input id="v20-task-id" type="hidden"><div class="setting-grid"><div class="form-group full"><label>Task Title</label><input id="v20-task-title"></div><div class="form-group"><label>Task Type</label><select id="v20-task-type"><option value="ads">Ads Task</option><option value="link">Link Task</option></select></div><div class="form-group"><label>Reward Amount</label><input id="v20-task-reward" type="number" step="0.01"></div><div class="form-group full"><label>Task Link</label><input id="v20-task-link"></div><label><input type="checkbox" id="v20-task-enabled" checked> Status ON</label></div><button class="btn btn-p" onclick="saveV20Task()">Add / Update Task</button><div id="v20-task-list" class="v20-list"></div></div></div>
+  <div id="admin-v20notify" class="admin-subview hidden"><div class="admin-card"><h4>🔔 Notification Channels</h4><div class="setting-grid"><div class="form-group"><label>Channel ID</label><input id="v20-ch-id" placeholder="-100..."></div><div class="form-group"><label>Channel Name</label><input id="v20-ch-title"></div></div><button class="btn btn-p" onclick="saveV20Channel()">Add / Change Channel</button><div id="v20-channel-list" class="v20-list"></div></div></div>
+  <div id="admin-v20withdraw" class="admin-subview hidden"><div class="admin-card"><h4>💸 Withdraw Requests</h4><div id="v20-withdraw-list" class="v20-list"></div></div></div>
   <div id="admin-settings" class="admin-subview hidden">
     <div class="admin-card">
       <h4>⚙️ Bot & Mini App Control</h4>
@@ -768,14 +816,14 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
           </div>
         </div>
       </div>
-      <div class="admin-card" style="margin:14px 0;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.22)">
+      <div class="admin-card" id="legacy-tutorial-card" style="margin:14px 0;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.22)">
         <h4 style="margin-bottom:10px">🎓 New User Tutorial</h4>
         <div class="form-group"><label><input id="set-tutorial-enabled" type="checkbox" checked> /start করলে Tutorial Video পাঠান</label></div>
         <div class="form-group full"><label>Tutorial Video Code</label><input id="set-tutorial-code" placeholder="video_145"><small style="opacity:.7">সবচেয়ে সহজ: Storage Channel-এ tutorial video upload করুন → Owner inbox-এর “Tutorial Video হিসেবে সেট করুন” বাটন চাপুন।</small></div>
         <div class="form-group full"><label>Tutorial Caption</label><textarea id="set-tutorial-caption" rows="4" placeholder="ভিডিও দেখে নিয়ম বুঝে নিন..."></textarea></div>
         <div class="form-group"><label>Tutorial Button Text</label><input id="set-tutorial-button" placeholder="🎬 ভিডিও দেখতে শুরু করুন"></div>
       </div>
-      <div class="form-group"><label>Watch Button Text</label><input id="set-watch-text" placeholder="▶ ভিডিও দেখুন"></div>
+      <div class="form-group"><label>Watch Button Text</label><input id="set-watch-text" placeholder="Watch Video"></div>
       <div class="form-group"><label>Broadcast Button Text</label><input id="set-broadcast-text" placeholder="▶ ভিডিও ওপেন করুন"></div>
       <div class="form-group"><label>Video Auto Delete (minutes)</label><input id="set-delete-min" type="number" min="1" value="20"></div>
       <div class="form-group"><label><input id="set-protect" type="checkbox" checked> Protected Content (Forward/Save restriction)</label></div>
@@ -1384,21 +1432,21 @@ async function renderAdGate(v){
     finally { clearTimeout(timeoutId); }
 
     if(st.unlocked){
-      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিওটি প্রস্তুত 💜</div><div class="v192-unlock-sub">আপনার অ্যাক্সেস সম্পন্ন হয়েছে। এখন ভিডিওটি খুলুন।</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">▶ ${escapeHtml(st.unlock_text||'ভিডিও দেখুন')}</button><div class="v192-secure">🛡️ Protected delivery • নিরাপদ অ্যাক্সেস</div></div>`;
+      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">✅ Video Unlocked</div><div class="v192-unlock-sub">আপনার অ্যাক্সেস সম্পন্ন হয়েছে। এখন ভিডিওটি খুলুন।</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">Watch Video</button><div class="v192-secure">🛡️ Protected delivery • নিরাপদ অ্যাক্সেস</div></div>`;
       return;
     }
 
     const a=st.adsgram||{}, m=st.monetag||{};
     const providers=[];
-    if(a.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${a.completed}/${a.required} সম্পন্ন</div></div><button class="btn btn-p" id="adsgram-watch-btn" onclick="watchProviderAd('${v.id}','adsgram')">▶ চালিয়ে যান</button></div>`);
-    if(m.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${m.completed}/${m.required} সম্পন্ন${m.wait_seconds?` • ${m.wait_seconds}s`:''}</div></div><button class="btn btn-p" id="monetag-watch-btn" onclick="watchProviderAd('${v.id}','monetag')">▶ চালিয়ে যান</button></div>`);
+    if(a.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${a.completed}/${a.required} সম্পন্ন</div></div><button class="btn btn-p" id="adsgram-watch-btn" onclick="watchProviderAd('${v.id}','adsgram')">Continue</button></div>`);
+    if(m.enabled) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">🎁 ভিডিও অ্যাক্সেস ধাপ</div><div class="v192-provider-progress">${m.completed}/${m.required} complete</div></div><button class="btn btn-p" id="monetag-watch-btn" onclick="watchProviderAd('${v.id}','monetag')">Continue</button></div>`);
 
     if(!providers.length){
-      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিও দেখতে চান?</div><div class="v192-unlock-sub">ভিডিওটি খুলতে নিচের বাটনে চাপুন।</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">▶ ভিডিও দেখুন</button><div class="v192-secure">🛡️ Protected delivery</div></div>`;
+      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">🎁 Video Access</div><div class="v192-unlock-sub">Complete required step</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">Watch Video</button><div class="v192-secure">🛡️ Protected delivery</div></div>`;
       return;
     }
 
-    area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">ভিডিও দেখতে চান?</div><div class="v192-unlock-sub">প্রয়োজনীয় ধাপ সম্পন্ন হলে ভিডিওটি অটোমেটিক আনলক হবে 😊</div></div></div><div class="v192-provider-stack">${providers.join('')}</div><div class="v192-secure">🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়</div></div>`;
+    area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">🎁 Video Access</div><div class="v192-unlock-sub">প্রয়োজনীয় ধাপ সম্পন্ন হলে ভিডিওটি অটোমেটিক আনলক হবে 😊</div></div></div><div class="v192-provider-stack">${providers.join('')}</div><div class="v192-secure">🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়</div></div>`;
   }catch(e){
     console.error('Ad status load failed',e);
     const msg=(e&&e.name==='AbortError')?'ভিডিও অ্যাক্সেস লোড হতে একটু সময় লাগছে':'ভিডিও অ্যাক্সেস এখন পাওয়া যাচ্ছে না';
@@ -1407,7 +1455,7 @@ async function renderAdGate(v){
 }
 
 async function watchProviderAd(videoId,provider){
-  const id=provider==='monetag'?'monetag-watch-btn':'adsgram-watch-btn'; const btn=document.getElementById(id); if(btn){btn.disabled=true;btn.textContent='Ad loading...';}
+  const id=provider==='monetag'?'monetag-watch-btn':'adsgram-watch-btn'; const btn=document.getElementById(id); if(btn){btn.disabled=true;btn.textContent='Continue';}
   try{
     const sess=await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/ad-session',{method:'POST',body:JSON.stringify({provider})});
     if(sess.bypass){await renderAdGate(currentActiveVid);return;}
@@ -1724,7 +1772,7 @@ let settingsSaveInFlight = false;
 async function saveAdminSettings() {
   if(settingsSaveInFlight) return;
   const gv=id=>document.getElementById(id)?.value?.trim();
-  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'▶ ভিডিও দেখুন',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',monetization_mode:gv('set-monetization-mode')||'both',monetag_enabled:document.getElementById('set-monetag-enabled')?.checked!==false,monetag_zone_id:gv('set-monetag-zone-id')||'11404425',monetag_required_default:parseInt(gv('set-monetag-required-default'))||1,monetag_button_text:gv('set-monetag-button-text')||'💰 Monetag Ad দেখুন',monetag_wait_seconds:parseInt(gv('set-monetag-wait-seconds'))||20,welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_video_button_url:gv('set-welcome-video-button-url')||null,welcome_video_button_enabled:document.getElementById('set-welcome-video-button-enabled')?.checked!==false,welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_start_button_url:gv('set-welcome-start-button-url')||null,welcome_start_button_enabled:document.getElementById('set-welcome-start-button-enabled')?.checked!==false,welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন',welcome_rejoin_button_url:gv('set-welcome-rejoin-button-url')||null,welcome_rejoin_button_enabled:document.getElementById('set-welcome-rejoin-button-enabled')?.checked!==false};
+  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'Watch Video',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',monetization_mode:gv('set-monetization-mode')||'both',monetag_enabled:document.getElementById('set-monetag-enabled')?.checked!==false,monetag_zone_id:gv('set-monetag-zone-id')||'11404425',monetag_required_default:parseInt(gv('set-monetag-required-default'))||1,monetag_button_text:gv('set-monetag-button-text')||'💰 Monetag Ad দেখুন',monetag_wait_seconds:parseInt(gv('set-monetag-wait-seconds'))||20,welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_video_button_url:gv('set-welcome-video-button-url')||null,welcome_video_button_enabled:document.getElementById('set-welcome-video-button-enabled')?.checked!==false,welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_start_button_url:gv('set-welcome-start-button-url')||null,welcome_start_button_enabled:document.getElementById('set-welcome-start-button-enabled')?.checked!==false,welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন',welcome_rejoin_button_url:gv('set-welcome-rejoin-button-url')||null,welcome_rejoin_button_enabled:document.getElementById('set-welcome-rejoin-button-enabled')?.checked!==false};
   const btn=document.getElementById('settings-save-btn');
   settingsSaveInFlight=true;
   if(btn){btn.disabled=true;btn.textContent='⏳ সেভ হচ্ছে...';}
@@ -1758,7 +1806,7 @@ async function loadAdmins(){
 }
 async function saveAdminUser(){
   const id=parseInt(document.getElementById('new-admin-id').value);if(!id)return showToast('User ID দিন','danger');
-  const body={user_id:id,display_name:document.getElementById('new-admin-name').value.trim()||'Admin',role:'admin',can_manage_content:document.getElementById('perm-content').checked,can_manage_settings:document.getElementById('perm-settings').checked,can_broadcast:document.getElementById('perm-broadcast').checked,can_manage_users:document.getElementById('perm-users').checked,can_manage_admins:document.getElementById('perm-admins').checked};
+  const body={user_id:id,display_name:document.getElementById('new-admin-name').value.trim()||'Admin',role:'admin',can_manage_content:document.getElementById('perm-content').checked,can_manage_settings:document.getElementById('perm-settings').checked,can_broadcast:document.getElementById('perm-broadcast').checked,can_manage_users:document.getElementById('perm-users').checked,can_manage_admins:document.getElementById('perm-admins').checked,can_manage_packages:document.getElementById('perm-packages').checked,can_manage_withdraw:document.getElementById('perm-withdraw').checked,can_manage_support:document.getElementById('perm-support').checked,can_manage_tasks:document.getElementById('perm-tasks').checked,can_manage_notifications:document.getElementById('perm-notify').checked,can_view_analytics:document.getElementById('perm-analytics').checked};
   try{await apiFetch('/api/admin/admins',{method:'POST',body:JSON.stringify(body)});showToast('Admin saved ✅','success');loadAdmins();}catch(e){showToast('Admin save failed','danger');}
 }
 async function removeAdmin(id){if(!confirm('Admin remove করবেন?'))return;try{await apiFetch('/api/admin/admins/'+id,{method:'DELETE'});loadAdmins();}catch(e){showToast('Remove failed','danger');}}
@@ -1916,7 +1964,7 @@ async function updateProfileStats(){
   try{
     const p=await apiFetch('/api/profile');
     const map={'prof-opened':p.opened_total,'prof-unlocked':p.unlocked,'prof-favorites':p.favorites,'prof-reactions':p.reactions,'prof-comments':p.comments,'prof-ad-tasks':p.ad_tasks,'prof-unique':p.opened_unique};
-    Object.entries(map).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=Number(v||0)});
+    Object.entries(map).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=Number(v||0)});const jd=document.getElementById('prof-join-date');if(jd&&p.join_date)jd.textContent=new Date(p.join_date).toLocaleDateString();
     const r=document.getElementById('prof-recent'); if(r) r.innerHTML=(p.recent_unlocked||[]).length?(p.recent_unlocked||[]).map(v=>`<div class="v8-recent-item"><img src="${v.thumb||''}"><div><b>${escapeHtml(v.title)}</b><span>🔓 আনলক করা</span></div></div>`).join(''):'<div class="empty-state" style="padding:14px">এখনো কোনো ভিডিও আনলক করা হয়নি</div>';
   }catch(e){console.warn('profile stats failed',e);}
 }
@@ -1990,6 +2038,30 @@ function clearAppData() {
 }
 
 window.onload = initApp;
+</script>
+
+<script>
+let v20AdminConfig=null;
+function v20Money(v){return '৳'+Number(v||0).toFixed(2)}
+async function loadV20Profile(){if(!user?.id)return;try{const [w,t]=await Promise.all([apiFetch('/api/v20/wallet'),apiFetch('/api/v20/tasks')]);[['v20-balance',v20Money(w.balance)],['v20-watched',w.total_video_watched],['v20-unlocks',w.total_video_unlock],['v20-earned',v20Money(w.total_earn)],['v20-withdrawn',v20Money(w.total_withdraw)]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v});const hb=document.getElementById('home-v20-balance');if(hb)hb.textContent=v20Money(w.balance);const hw=document.getElementById('home-v20-watch');if(hw)hw.textContent=w.total_video_watched||0;const hu=document.getElementById('home-v20-user');if(hu)hu.textContent=user.username?'@'+user.username:String(user.first_name||'User');const h=document.getElementById('v20-withdraw-history');if(h)h.innerHTML=(w.withdraw_history||[]).map(x=>`<div class="v20-list-item">${v20Money(x.amount)} · ${escapeHtml(x.payment_method)} · ${escapeHtml(x.account_number)}<br><small>${escapeHtml(x.status)}</small></div>`).join('')||'<div class="empty-state">No withdraw history</div>';const tl=document.getElementById('v20-user-tasks');if(tl)tl.innerHTML=(t.tasks||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title)}</b><div>${x.task_type} · Reward ${v20Money(x.reward_amount)}</div>${x.completed?'✅ Completed':`<button class="btn btn-p" style="margin-top:8px" onclick="completeV20Task(${x.id},'${String(x.task_link||'').replace(/'/g,"\\'")}')">Complete Task</button>`}</div>`).join('')||'<div class="empty-state">No active task</div>';}catch(e){console.warn(e)}}
+async function submitV20Withdraw(){try{await apiFetch('/api/v20/withdraw',{method:'POST',body:JSON.stringify({amount:Number(document.getElementById('v20-wd-amount').value),payment_method:document.getElementById('v20-wd-method').value,number:document.getElementById('v20-wd-number').value.trim()})});showToast('Withdraw request submitted ✅','success');loadV20Profile()}catch(e){showToast(e.message||'Withdraw failed','danger')}}
+async function completeV20Task(id,url){if(url)Telegram?.WebApp?.openLink?Telegram.WebApp.openLink(url):window.open(url,'_blank');try{const r=await apiFetch('/api/v20/tasks/'+id+'/complete',{method:'POST',body:'{}'});showToast(`Task completed +${v20Money(r.reward||0)} ✅`,'success');loadV20Profile()}catch(e){showToast(e.message||'Task failed','danger')}}
+async function loadV20Admin(){if(!serverIsAdmin)return;try{const d=await apiFetch('/api/v20/admin/config');v20AdminConfig=d;const t=d.tutorial||{},w=d.wallet||{},b=d.buttons||{},a=d.ads||{};const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''},check=(id,v)=>{const e=document.getElementById(id);if(e)e.checked=!!v};set('v20-vmsg',b.custom_message);set('v20-b1n',b.button1_name);set('v20-b1u',b.button1_url);check('v20-b1e',b.button1_enabled);set('v20-b2n',b.button2_name);set('v20-b2u',b.button2_url);check('v20-b2e',b.button2_enabled);set('v20-dmsg',b.deleted_message);set('v20-db1n',b.deleted_button1_name);set('v20-db1u',b.deleted_button1_url);check('v20-db1e',b.deleted_button1_enabled);set('v20-db2n',b.deleted_button2_name);set('v20-db2u',b.deleted_button2_url);check('v20-db2e',b.deleted_button2_enabled);check('v20-t-enabled',t.enabled);set('v20-t-code',t.video_code);set('v20-t-title',t.title);set('v20-t-desc',t.description);set('v20-t-btn',t.button_text);set('v20-w-reward',w.per_video_reward);set('v20-w-daily',w.daily_reward_limit);set('v20-w-min',w.minimum_withdraw);set('v20-w-max',w.maximum_withdraw);check('v20-w-enabled',w.withdraw_enabled);set('v20-w-methods',w.payment_methods);set('v20-ad-mode',a.mode||'both');check('v20-ag-enabled',a.adsgram_enabled);set('v20-ag-block',a.adsgram_block_id);set('v20-ag-required',a.adsgram_required);check('v20-ag-reward',a.adsgram_reward_mode);check('v20-mo-enabled',a.monetag_enabled);set('v20-mo-zone',a.monetag_zone_id);set('v20-mo-link',a.monetag_smart_link);set('v20-mo-script',a.monetag_script_api);set('v20-mo-wait',a.monetag_wait_seconds);renderV20AdminLists(d);const tt=document.getElementById('v20-tutorial-tab');if(tt&&!d.is_owner)tt.style.display='none';const lt=document.getElementById('legacy-tutorial-card');if(lt&&!d.is_owner)lt.style.display='none';}catch(e){console.warn('v20 admin load',e)}}
+function renderV20AdminLists(d){const tl=document.getElementById('v20-task-list');if(tl)tl.innerHTML=(d.tasks||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title)}</b> · ${x.task_type} · ${v20Money(x.reward_amount)} <button onclick="deleteV20Task(${x.id})">🗑</button></div>`).join('');const cl=document.getElementById('v20-channel-list');if(cl)cl.innerHTML=(d.channels||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title||String(x.chat_id))}</b><br><small>${x.chat_id}</small> <button onclick="deleteV20Channel(${x.id})">🗑</button></div>`).join('');const wl=document.getElementById('v20-withdraw-list');if(wl)wl.innerHTML=(d.withdraws||[]).map(x=>`<div class="v20-list-item"><b>User ${x.user_id}</b> · ${v20Money(x.amount)}<br>${escapeHtml(x.payment_method)} · ${escapeHtml(x.account_number)} · ${escapeHtml(x.status)}${x.status==='pending'?`<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-p" onclick="reviewV20Withdraw(${x.id},'approved')">Approve</button><button class="btn btn-d" onclick="reviewV20Withdraw(${x.id},'rejected')">Reject</button></div>`:''}</div>`).join('')||'<div class="empty-state">No requests</div>'}
+async function saveV20Section(section,data){try{await apiFetch('/api/v20/admin/config',{method:'POST',body:JSON.stringify({section,...data})});showToast('Saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Save failed','danger')}}
+function saveV20Buttons(){saveV20Section('buttons',{custom_message:v20('v20-vmsg'),button1_name:v20('v20-b1n'),button1_url:v20('v20-b1u'),button1_enabled:v20c('v20-b1e'),button2_name:v20('v20-b2n'),button2_url:v20('v20-b2u'),button2_enabled:v20c('v20-b2e'),deleted_message:v20('v20-dmsg'),deleted_button1_name:v20('v20-db1n'),deleted_button1_url:v20('v20-db1u'),deleted_button1_enabled:v20c('v20-db1e'),deleted_button2_name:v20('v20-db2n'),deleted_button2_url:v20('v20-db2u'),deleted_button2_enabled:v20c('v20-db2e')})}
+function saveV20Tutorial(){saveV20Section('tutorial',{enabled:v20c('v20-t-enabled'),video_code:v20('v20-t-code'),title:v20('v20-t-title'),description:v20('v20-t-desc'),button_text:v20('v20-t-btn')})}
+function deleteV20Tutorial(){if(!confirm('Tutorial video delete করবেন?'))return;saveV20Section('tutorial',{enabled:false,video_code:null,title:v20('v20-t-title'),description:v20('v20-t-desc'),button_text:v20('v20-t-btn')})}
+function saveV20WalletSettings(){saveV20Section('wallet',{per_video_reward:Number(v20('v20-w-reward')),daily_reward_limit:Number(v20('v20-w-daily')),minimum_withdraw:Number(v20('v20-w-min')),maximum_withdraw:Number(v20('v20-w-max')),withdraw_enabled:v20c('v20-w-enabled'),payment_methods:v20('v20-w-methods')})}
+function saveV20Ads(){saveV20Section('ads',{mode:v20('v20-ad-mode'),adsgram_enabled:v20c('v20-ag-enabled'),adsgram_block_id:v20('v20-ag-block'),adsgram_required:Number(v20('v20-ag-required')),adsgram_reward_mode:v20c('v20-ag-reward'),monetag_enabled:v20c('v20-mo-enabled'),monetag_zone_id:v20('v20-mo-zone'),monetag_smart_link:v20('v20-mo-link'),monetag_script_api:v20('v20-mo-script'),monetag_wait_seconds:Number(v20('v20-mo-wait'))})}
+function v20(id){return document.getElementById(id)?.value||''}function v20c(id){return !!document.getElementById(id)?.checked}
+async function saveV20Task(){try{await apiFetch('/api/v20/admin/tasks',{method:'POST',body:JSON.stringify({id:v20('v20-task-id')||null,title:v20('v20-task-title'),task_type:v20('v20-task-type'),reward_amount:Number(v20('v20-task-reward')),task_link:v20('v20-task-link'),enabled:v20c('v20-task-enabled')})});showToast('Task saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Task save failed','danger')}}
+async function deleteV20Task(id){await apiFetch('/api/v20/admin/tasks/'+id,{method:'DELETE'});loadV20Admin()}
+async function saveV20Channel(){try{await apiFetch('/api/v20/admin/channels',{method:'POST',body:JSON.stringify({chat_id:Number(v20('v20-ch-id')),title:v20('v20-ch-title'),enabled:true})});showToast('Channel saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Channel save failed','danger')}}
+async function deleteV20Channel(id){await apiFetch('/api/v20/admin/channels/'+id,{method:'DELETE'});loadV20Admin()}
+async function reviewV20Withdraw(id,status){try{await apiFetch('/api/v20/admin/withdraw/'+id,{method:'POST',body:JSON.stringify({status})});showToast('Withdraw '+status+' ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Failed','danger')}}
+const _v20OldProfile=updateProfileStats;updateProfileStats=async function(){await _v20OldProfile();await loadV20Profile()};
+const _v20OldSwitch=switchAdminSubView;switchAdminSubView=function(id,btn){_v20OldSwitch(id,btn);if(id.startsWith('v20'))loadV20Admin()};
 </script>
 </body>
 </html>
