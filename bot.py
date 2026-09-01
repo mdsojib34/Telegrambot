@@ -118,7 +118,7 @@ async def db_execute(sql, args=()):
 async def refresh_admin_cache():
     global ADMIN_CACHE, ADMIN_PERMS
     ADMIN_CACHE = {OWNER_ID}
-    ADMIN_PERMS = {OWNER_ID: {"role":"owner","can_manage_content":True,"can_manage_settings":True,"can_broadcast":True,"can_manage_users":True,"can_manage_admins":True}}
+    ADMIN_PERMS = {OWNER_ID: {"role":"owner","can_manage_content":True,"can_manage_settings":True,"can_broadcast":True,"can_manage_users":True,"can_manage_admins":True,"can_manage_packages":True,"can_manage_withdraw":True,"can_manage_support":True,"can_manage_tasks":True,"can_manage_notifications":True,"can_view_analytics":True}}
     try:
         rows = await db_fetchall("SELECT * FROM admin_users")
         for r in rows:
@@ -331,6 +331,15 @@ async def deliver_video(message: Message, code: str):
     if not rec:
         await message.answer("❌ এই ভিডিওটি পাওয়া যায়নি বা সরানো হয়েছে।")
         return
+    try:
+        prev = await db_fetchone("SELECT created_at FROM video_requests WHERE user_id=%s AND video_code=%s AND delivered=TRUE ORDER BY created_at DESC LIMIT 1", (message.from_user.id, code))
+        mins = int(settings.get("auto_delete_minutes") or 20)
+        if prev and prev.get("created_at") and prev["created_at"] <= utcnow_sql() - timedelta(minutes=max(1, mins)):
+            cfg = await v20_video_buttons()
+            await message.answer(cfg.get("deleted_message") or "ভিডিওটি ডিলিট হয়ে গেছে ❌\n\nআবার দেখতে চাইলে আমাদের সাথে থাকুন\nভাইরাল ভিডিও ❤️", reply_markup=v20_button_keyboard(cfg, True))
+            return
+    except Exception:
+        log.exception("V20 expired-video check failed")
 
     try:
         sent = await bot.copy_message(
@@ -365,6 +374,14 @@ async def deliver_video(message: Message, code: str):
             "INSERT INTO user_video_events(user_id,video_id,video_code,event_type,created_at) VALUES(%s,%s,%s,'delivered',%s)",
             (message.from_user.id, pub["id"] if pub else None, code, utcnow_sql()),
         )
+        try:
+            vcfg = await v20_video_buttons()
+            cmsg = (vcfg.get("custom_message") or "").strip()
+            if cmsg:
+                extra = await message.answer(cmsg, reply_markup=v20_button_keyboard(vcfg, False))
+                await db_execute("INSERT INTO delete_queue(chat_id,message_id,delete_at,status,created_at) VALUES(%s,%s,%s,'pending',%s)", (message.chat.id, extra.message_id, delete_at, utcnow_sql()))
+        except Exception:
+            log.exception("V20 custom video message failed")
     except Exception:
         log.exception("copy video failed")
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Storage Channel permission চেক করুন।")
@@ -376,6 +393,15 @@ async def deliver_video_from_video_bot(message: Message, code: str):
     if not rec:
         await message.answer("❌ এই ভিডিওটি পাওয়া যায়নি বা সরানো হয়েছে।")
         return
+    try:
+        prev = await db_fetchone("SELECT created_at FROM video_requests WHERE user_id=%s AND video_code=%s AND delivered=TRUE ORDER BY created_at DESC LIMIT 1", (message.from_user.id, code))
+        mins = int(settings.get("auto_delete_minutes") or 20)
+        if prev and prev.get("created_at") and prev["created_at"] <= utcnow_sql() - timedelta(minutes=max(1, mins)):
+            cfg = await v20_video_buttons()
+            await video_bot.send_message(message.chat.id, cfg.get("deleted_message") or "ভিডিওটি ডিলিট হয়ে গেছে ❌\n\nআবার দেখতে চাইলে আমাদের সাথে থাকুন\nভাইরাল ভিডিও ❤️", reply_markup=v20_button_keyboard(cfg, True), protect_content=True)
+            return
+    except Exception:
+        log.exception("V20 video-bot expired-video check failed")
     try:
         sent = await video_bot.copy_message(
             chat_id=message.chat.id,
@@ -400,9 +426,39 @@ async def deliver_video_from_video_bot(message: Message, code: str):
             "INSERT INTO user_video_events(user_id,video_id,video_code,event_type,created_at) VALUES(%s,%s,%s,'delivered_video_bot',%s)",
             (message.from_user.id, pub["id"] if pub else None, code, utcnow_sql()),
         )
+        try:
+            vcfg = await v20_video_buttons()
+            cmsg = (vcfg.get("custom_message") or "").strip()
+            if cmsg:
+                extra = await video_bot.send_message(message.chat.id, cmsg, reply_markup=v20_button_keyboard(vcfg, False), protect_content=True)
+                await db_execute("INSERT INTO delete_queue(bot_kind,chat_id,message_id,delete_at,status,created_at) VALUES('video',%s,%s,%s,'pending',%s)", (message.chat.id, extra.message_id, delete_at, utcnow_sql()))
+        except Exception:
+            log.exception("V20 video-bot custom message failed")
     except Exception:
         log.exception("video bot copy failed")
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Video Bot-কে Storage Channel-এর Admin করুন।")
+
+
+async def send_mini_start_tutorial(message: Message, settings):
+    try:
+        if not message.from_user:
+            return False
+        seen = await db_fetchone("SELECT 1 x FROM tutorial_views WHERE user_id=%s", (message.from_user.id,))
+        cfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
+        if seen or not cfg.get("enabled", True) or not cfg.get("video_code"):
+            return False
+        rec = await lookup_video(str(cfg.get("video_code")))
+        if not rec:
+            return False
+        url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=str(cfg.get("button_text") or "🏠 Home Page")[:64], web_app=WebAppInfo(url=url))]]) if valid_webapp_url(url) else None
+        caption = ((cfg.get("title") or "ভিডিও দেখার নিয়ম") + "\n\n" + (cfg.get("description") or "")).strip()
+        await mini_bot.copy_message(chat_id=message.chat.id,from_chat_id=int(rec["channel_id"]),message_id=int(rec["message_id"]),caption=caption,reply_markup=kb,protect_content=True)
+        await db_execute("INSERT INTO tutorial_views(user_id,viewed_at) VALUES(%s,%s) ON CONFLICT(user_id) DO NOTHING", (message.from_user.id,utcnow_sql()))
+        return True
+    except Exception:
+        log.exception("Mini Bot V20 tutorial failed")
+        return False
 
 
 @mini_dp.message(CommandStart())
@@ -420,6 +476,8 @@ async def mini_bot_start_handler(message: Message):
     elif payload.startswith("welcome"):
         welcome = settings.get("join_welcome_text") or welcome
     kb = await mini_webapp_keyboard(settings)
+    if not payload and await send_mini_start_tutorial(message, settings):
+        return
     await message.answer(welcome, reply_markup=kb)
 
 
@@ -500,7 +558,24 @@ async def start_handler(message: Message):
     if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
         await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
         return
-    tutorial_sent = await send_start_tutorial(message, settings)
+    tutorial_sent = False
+    try:
+        tv = await db_fetchone("SELECT 1 x FROM tutorial_views WHERE user_id=%s", (message.from_user.id,))
+        tcfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
+        if not tv and tcfg.get("enabled", True):
+            # V20 owner tutorial config overrides legacy app_settings when set.
+            if tcfg.get("video_code"):
+                settings = dict(settings)
+                settings["tutorial_enabled"] = True
+                settings["tutorial_video_code"] = tcfg.get("video_code")
+                settings["tutorial_caption"] = ((tcfg.get("title") or "ভিডিও দেখার নিয়ম") + "\n\n" + (tcfg.get("description") or "")).strip()
+                settings["tutorial_button_text"] = tcfg.get("button_text") or "🏠 Home Page"
+            tutorial_sent = await send_start_tutorial(message, settings)
+            if tutorial_sent:
+                await db_execute("INSERT INTO tutorial_views(user_id,viewed_at) VALUES(%s,%s) ON CONFLICT(user_id) DO NOTHING", (message.from_user.id, utcnow_sql()))
+    except Exception:
+        log.exception("V20 tutorial tracking failed")
+        tutorial_sent = await send_start_tutorial(message, settings)
     if tutorial_sent:
         return
     welcome = settings.get("welcome_text") or (
@@ -583,12 +658,6 @@ async def _notify_all_admins_new_video(*, code: str, deep_link: str, caption: st
         except Exception:
             pass
 
-    buttons = [[InlineKeyboardButton(text="🔗 Video Bot Link খুলুন", url=deep_link)]]
-    if valid_webapp_url(web_url):
-        buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel খুলুন", url=f"https://t.me/{MINI_BOT_USERNAME}?start=admin")])
-    buttons.append([InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")])
-    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-
     note = (
         f"✅ <b>নতুন ভিডিও detect হয়েছে</b>\n\n"
         f"🆔 Video Code: <code>{code}</code>\n"
@@ -603,6 +672,13 @@ async def _notify_all_admins_new_video(*, code: str, deep_link: str, caption: st
 
     for uid in targets:
         try:
+            buttons = [[InlineKeyboardButton(text="🔗 Video Bot Link খুলুন", url=deep_link)]]
+            if valid_webapp_url(web_url):
+                buttons.append([InlineKeyboardButton(text="⚙️ Admin Panel খুলুন", url=f"https://t.me/{MINI_BOT_USERNAME}?start=admin")])
+            # V20: tutorial action is visible only to the Owner.
+            if int(uid) == OWNER_ID:
+                buttons.append([InlineKeyboardButton(text="🎓 Tutorial Video হিসেবে সেট করুন", callback_data=f"set_tutorial:{code}")])
+            kb = InlineKeyboardMarkup(inline_keyboard=buttons)
             if auto_thumb:
                 header, encoded = auto_thumb.split(",", 1)
                 photo = BufferedInputFile(base64.b64decode(encoded), filename=f"{code}_thumb.jpg")
@@ -810,18 +886,16 @@ async def storage_channel_post(message: Message):
 
 @dp.callback_query(F.data.startswith("set_tutorial:"))
 async def set_tutorial_callback(query: CallbackQuery):
-    if not query.from_user or not is_admin_id(query.from_user.id) or not has_perm(query.from_user.id, "can_manage_settings"):
-        await query.answer("Admin permission required", show_alert=True)
+    if not query.from_user or int(query.from_user.id) != OWNER_ID:
+        await query.answer("Owner only", show_alert=True)
         return
     code = (query.data or "").split(":", 1)[1].strip()
     rec = await lookup_video(code)
     if not rec:
         await query.answer("ভিডিও mapping পাওয়া যায়নি", show_alert=True)
         return
-    await db_execute(
-        "UPDATE app_settings SET tutorial_video_code=%s, tutorial_enabled=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id='main'",
-        (code,),
-    )
+    await db_execute("UPDATE app_settings SET tutorial_video_code=%s, tutorial_enabled=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id='main'", (code,))
+    await db_execute("UPDATE tutorial_settings SET video_code=%s,enabled=TRUE,updated_by=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'", (code, OWNER_ID))
     await query.answer("Tutorial video সেট হয়েছে ✅", show_alert=True)
     try:
         await query.message.edit_reply_markup(reply_markup=None)
@@ -872,6 +946,19 @@ async def broadcast_worker():
                     except Exception:
                         fail += 1
                         await db_execute("UPDATE video_bot_users SET is_active=FALSE WHERE user_id=%s", (uid,))
+                # V20: publish notification to selected channels as well.
+                try:
+                    channels = await db_fetchall("SELECT chat_id FROM notification_channels WHERE enabled=TRUE ORDER BY id")
+                    total_video = (await db_fetchone("SELECT COUNT(*) c FROM videos WHERE published=TRUE"))["c"]
+                    ch_caption = f"🔥 New Video Package\n\nPackage Name: {v.get('title','New Video')}\n\nTotal Video: {total_video}"
+                    ch_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="ভিডিও দেখুন", url=target_url)]])
+                    for ch in channels:
+                        try:
+                            await bot.send_message(int(ch["chat_id"]), ch_caption, reply_markup=ch_kb, protect_content=True)
+                        except Exception:
+                            log.exception("V20 selected-channel notification failed chat=%s", ch.get("chat_id"))
+                except Exception:
+                    log.exception("V20 selected-channel broadcast failed")
                 await db_execute("UPDATE videos SET broadcast_sent=TRUE WHERE id=%s", (v["id"],))
                 await bot.send_message(OWNER_ID, f"📢 Broadcast complete\n{v.get('title','')}\n✅ Sent: {ok}\n❌ Failed: {fail}")
         except Exception:
@@ -915,6 +1002,14 @@ def require_admin(request, perm=None):
     return u
 
 
+def require_admin_any(request, *perms):
+    u = require_admin(request)
+    uid = int(u.get("id", 0))
+    if uid == OWNER_ID or any(has_perm(uid, p) for p in perms):
+        return u
+    raise web.HTTPForbidden(text="Admin permission denied")
+
+
 async def json_body(request):
     try:
         return await request.json()
@@ -927,7 +1022,7 @@ async def index_handler(request):
 
 
 async def health_handler(request):
-    return web.json_response({"ok": True, "service": "viral-video-bot-v19", "database": "postgresql", "mini_bot": MINI_BOT_USERNAME, "notification_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
+    return web.json_response({"ok": True, "service": "viral-video-bot-v20", "database": "postgresql", "mini_bot": MINI_BOT_USERNAME, "notification_bot": BOT_USERNAME, "video_bot": VIDEO_BOT_USERNAME})
 
 
 async def api_bootstrap(request):
@@ -1033,6 +1128,7 @@ async def api_increment_view(request):
             (uid, video_id, utcnow_sql(), utcnow_sql()),
         )
         await db_execute("INSERT INTO user_video_events(user_id,video_id,event_type,created_at) VALUES(%s,%s,'detail_open',%s)", (uid, video_id, utcnow_sql()))
+        await v20_credit_video_reward(uid, video_id)
     return web.json_response({"ok": True})
 
 
@@ -1069,7 +1165,9 @@ async def api_profile(request):
            JOIN videos v ON v.video_code=r.video_code WHERE r.user_id=%s AND r.delivered=TRUE
            ORDER BY v.id,r.created_at DESC LIMIT 5""", (uid,)
     )
+    joined = await db_fetchone("SELECT created_at FROM mini_bot_users WHERE user_id=%s", (uid,))
     return web.Response(text=json.dumps({
+        "join_date": (joined or {}).get("created_at"),
         "opened_total": int(opened["c"] or 0), "opened_unique": int(opened["unique_c"] or 0),
         "unlocked": int(unlocked["c"] or 0), "favorites": int(favs["c"] or 0),
         "reactions": int(reacts["c"] or 0), "comments": int(comments["c"] or 0), "ad_tasks": int(ad_tasks["c"] or 0), "recent_unlocked": recent
@@ -1151,6 +1249,7 @@ async def api_unlock_url(request):
     if mode in ("monetag","both") and settings.get("monetag_enabled", True) and mon_done < mon_req:
         raise web.HTTPForbidden(text=f"Complete Monetag first ({mon_done}/{mon_req})")
     await db_execute("INSERT INTO user_video_events(user_id,video_id,video_code,event_type,created_at) VALUES(%s,%s,%s,'unlock_granted',%s)", (int(u["id"]), vid, row.get("video_code"), utcnow_sql()))
+    await v20_credit_video_reward(int(u['id']), vid)
     dmode = (row.get("delivery_mode") or "video_bot").strip()
     if dmode == "short_link" and row.get("short_url"):
         return web.json_response({"ok": True, "url": row.get("short_url"), "mode": "short_link"})
@@ -1215,6 +1314,143 @@ async def api_ad_complete(request):
     return await api_ad_status(request)
 
 
+# ---------- V20 modular services ----------
+async def v20_wallet_settings():
+    return await db_fetchone("SELECT * FROM wallet_settings WHERE id='main'") or {}
+
+async def v20_video_buttons():
+    return await db_fetchone("SELECT * FROM video_buttons WHERE id='main'") or {}
+
+def v20_button_keyboard(cfg, deleted=False):
+    rows=[]
+    prefix='deleted_' if deleted else ''
+    for i in (1,2):
+        if cfg.get(f'{prefix}button{i}_enabled') and cfg.get(f'{prefix}button{i}_name') and cfg.get(f'{prefix}button{i}_url'):
+            rows.append([InlineKeyboardButton(text=str(cfg[f'{prefix}button{i}_name'])[:64], url=str(cfg[f'{prefix}button{i}_url']))])
+    return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
+
+async def v20_credit_video_reward(user_id:int, video_id:str):
+    ws=await v20_wallet_settings(); amount=float(ws.get('per_video_reward') or 0)
+    if amount <= 0: return 0.0
+    daily=float(ws.get('daily_reward_limit') or 0)
+    if daily > 0:
+        r=await db_fetchone("SELECT COALESCE(SUM(amount),0) c FROM transactions WHERE user_id=%s AND type='credit' AND reference_type='video' AND created_at>=CURRENT_DATE",(user_id,))
+        if float(r['c'] or 0) >= daily: return 0.0
+        amount=min(amount,max(0,daily-float(r['c'] or 0)))
+    try:
+        await db_execute("INSERT INTO transactions(user_id,type,amount,reference_type,reference_id,note) VALUES(%s,'credit',%s,'video',%s,'Video watch reward')",(user_id,amount,video_id))
+    except Exception:
+        return 0.0
+    await db_execute("INSERT INTO wallet(user_id,balance,total_earn,updated_at) VALUES(%s,%s,%s,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET balance=wallet.balance+EXCLUDED.balance,total_earn=wallet.total_earn+EXCLUDED.total_earn,updated_at=CURRENT_TIMESTAMP",(user_id,amount,amount))
+    return amount
+
+async def api_v20_wallet(request):
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text='Telegram authorization required')
+    uid=int(u['id'])
+    w=await db_fetchone("SELECT * FROM wallet WHERE user_id=%s",(uid,)) or {'balance':0,'total_earn':0,'total_withdraw':0}
+    watched=(await db_fetchone("SELECT COALESCE(SUM(open_count),0) c FROM video_views WHERE user_id=%s",(uid,)))['c']
+    unlocked=(await db_fetchone("SELECT COUNT(DISTINCT video_code) c FROM video_requests WHERE user_id=%s AND delivered=TRUE",(uid,)))['c']
+    tx=await db_fetchall("SELECT type,amount,reference_type,note,created_at FROM transactions WHERE user_id=%s ORDER BY created_at DESC LIMIT 20",(uid,))
+    wr=await db_fetchall("SELECT id,amount,payment_method,account_number,status,created_at FROM withdraw_requests WHERE user_id=%s ORDER BY created_at DESC LIMIT 20",(uid,))
+    return web.Response(text=json.dumps({'balance':float(w.get('balance') or 0),'total_earn':float(w.get('total_earn') or 0),'total_withdraw':float(w.get('total_withdraw') or 0),'total_video_watched':int(watched or 0),'total_video_unlock':int(unlocked or 0),'transactions':tx,'withdraw_history':wr},default=str,ensure_ascii=False),content_type='application/json')
+
+async def api_v20_withdraw(request):
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text='Telegram authorization required')
+    uid=int(u['id']); d=await json_body(request); ws=await v20_wallet_settings()
+    if not ws.get('withdraw_enabled',True): raise web.HTTPForbidden(text='Withdraw disabled')
+    try: amount=float(d.get('amount') or 0)
+    except: raise web.HTTPBadRequest(text='Invalid amount')
+    mn=float(ws.get('minimum_withdraw') or 0); mx=float(ws.get('maximum_withdraw') or 0)
+    if amount<=0 or amount<mn or (mx>0 and amount>mx): raise web.HTTPBadRequest(text=f'Withdraw range {mn}-{mx}')
+    method=str(d.get('payment_method') or '').strip(); number=str(d.get('number') or '').strip()
+    allowed=[x.strip() for x in str(ws.get('payment_methods') or 'bKash,Nagad').split(',') if x.strip()]
+    if method not in allowed or not number: raise web.HTTPBadRequest(text='Payment method/number required')
+    w=await db_fetchone("SELECT balance FROM wallet WHERE user_id=%s",(uid,)) or {'balance':0}
+    if float(w['balance'] or 0)<amount: raise web.HTTPBadRequest(text='Insufficient balance')
+    pending=(await db_fetchone("SELECT COALESCE(SUM(amount),0)c FROM withdraw_requests WHERE user_id=%s AND status='pending'",(uid,)))['c']
+    if float(w['balance'] or 0)-float(pending or 0)<amount: raise web.HTTPBadRequest(text='Balance already reserved by pending request')
+    await db_execute("INSERT INTO withdraw_requests(user_id,amount,payment_method,account_number) VALUES(%s,%s,%s,%s)",(uid,amount,method,number))
+    return web.json_response({'ok':True})
+
+async def api_v20_tasks(request):
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text='Telegram authorization required')
+    uid=int(u['id']); rows=await db_fetchall("SELECT t.*, EXISTS(SELECT 1 FROM task_completions c WHERE c.user_id=%s AND c.task_id=t.id) completed FROM tasks t WHERE enabled=TRUE ORDER BY id DESC",(uid,))
+    return web.Response(text=json.dumps({'tasks':rows},default=str,ensure_ascii=False),content_type='application/json')
+
+async def api_v20_task_complete(request):
+    u=request_user(request)
+    if not u: raise web.HTTPUnauthorized(text='Telegram authorization required')
+    uid=int(u['id']); tid=int(request.match_info['task_id']); t=await db_fetchone("SELECT * FROM tasks WHERE id=%s AND enabled=TRUE",(tid,))
+    if not t: raise web.HTTPNotFound(text='Task not found')
+    exists=await db_fetchone("SELECT 1 x FROM task_completions WHERE user_id=%s AND task_id=%s",(uid,tid))
+    if exists: return web.json_response({'ok':True,'already_completed':True})
+    amt=float(t.get('reward_amount') or 0)
+    await db_execute("INSERT INTO task_completions(user_id,task_id,rewarded) VALUES(%s,%s,TRUE)",(uid,tid))
+    if amt>0:
+        await db_execute("INSERT INTO transactions(user_id,type,amount,reference_type,reference_id,note) VALUES(%s,'credit',%s,'task',%s,%s)",(uid,amt,str(tid),t.get('title')))
+        await db_execute("INSERT INTO wallet(user_id,balance,total_earn,updated_at) VALUES(%s,%s,%s,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET balance=wallet.balance+EXCLUDED.balance,total_earn=wallet.total_earn+EXCLUDED.total_earn,updated_at=CURRENT_TIMESTAMP",(uid,amt,amt))
+    return web.json_response({'ok':True,'reward':amt})
+
+async def api_v20_admin_config(request):
+    u=require_admin(request)
+    uid=int(u['id'])
+    if request.method=='GET':
+        return web.Response(text=json.dumps({'tutorial':await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'"),'wallet':await v20_wallet_settings(),'buttons':await v20_video_buttons(),'ads':await db_fetchone("SELECT * FROM ad_settings WHERE id='main'"),'channels':await db_fetchall("SELECT * FROM notification_channels ORDER BY id"),'tasks':await db_fetchall("SELECT * FROM tasks ORDER BY id DESC"),'withdraws':await db_fetchall("SELECT * FROM withdraw_requests ORDER BY created_at DESC LIMIT 200") if (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw')) else [],'is_owner':uid==OWNER_ID},default=str,ensure_ascii=False),content_type='application/json')
+    d=await json_body(request); section=str(d.get('section') or '')
+    if section=='tutorial':
+        if uid!=OWNER_ID: raise web.HTTPForbidden(text='Owner only')
+        await db_execute("UPDATE tutorial_settings SET enabled=%s,video_code=%s,title=%s,description=%s,button_text=%s,updated_by=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(bool(d.get('enabled',True)),d.get('video_code'),str(d.get('title') or '')[:255],d.get('description'),str(d.get('button_text') or '🏠 Home Page')[:100],uid))
+    elif section=='wallet':
+        if not (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw') or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden()
+        await db_execute("UPDATE wallet_settings SET per_video_reward=%s,daily_reward_limit=%s,minimum_withdraw=%s,maximum_withdraw=%s,withdraw_enabled=%s,payment_methods=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(float(d.get('per_video_reward') or 0),float(d.get('daily_reward_limit') or 0),float(d.get('minimum_withdraw') or 0),float(d.get('maximum_withdraw') or 0),bool(d.get('withdraw_enabled',True)),str(d.get('payment_methods') or 'bKash,Nagad')))
+    elif section=='buttons':
+        if not has_perm(uid,'can_manage_settings'): raise web.HTTPForbidden()
+        keys=['custom_message','button1_name','button1_url','button1_enabled','button2_name','button2_url','button2_enabled','deleted_message','deleted_button1_name','deleted_button1_url','deleted_button1_enabled','deleted_button2_name','deleted_button2_url','deleted_button2_enabled']
+        vals=[d.get(k) for k in keys]; await db_execute('UPDATE video_buttons SET '+','.join(f'{k}=%s' for k in keys)+',updated_at=CURRENT_TIMESTAMP WHERE id=\'main\'',tuple(vals))
+    elif section=='ads':
+        if not has_perm(uid,'can_manage_settings'): raise web.HTTPForbidden()
+        await db_execute("UPDATE ad_settings SET mode=%s,adsgram_enabled=%s,adsgram_block_id=%s,adsgram_required=%s,adsgram_reward_mode=%s,monetag_enabled=%s,monetag_zone_id=%s,monetag_smart_link=%s,monetag_script_api=%s,monetag_wait_seconds=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(d.get('mode','both'),bool(d.get('adsgram_enabled')),d.get('adsgram_block_id'),int(d.get('adsgram_required') or 1),bool(d.get('adsgram_reward_mode',True)),bool(d.get('monetag_enabled')),d.get('monetag_zone_id'),d.get('monetag_smart_link'),d.get('monetag_script_api'),int(d.get('monetag_wait_seconds') or 20)))
+        await db_execute("UPDATE app_settings SET monetization_mode=%s,adsgram_enabled=%s,adsgram_block_id=%s,required_ads_default=%s,monetag_enabled=%s,monetag_zone_id=%s,monetag_wait_seconds=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(d.get('mode','both'),bool(d.get('adsgram_enabled')),d.get('adsgram_block_id'),int(d.get('adsgram_required') or 1),bool(d.get('monetag_enabled')),d.get('monetag_zone_id'),int(d.get('monetag_wait_seconds') or 20)))
+    else: raise web.HTTPBadRequest(text='Unknown section')
+    return web.json_response({'ok':True})
+
+async def api_v20_admin_tasks(request):
+    u=require_admin(request); uid=int(u['id'])
+    if not (uid==OWNER_ID or has_perm(uid,'can_manage_tasks') or has_perm(uid,'can_manage_content')): raise web.HTTPForbidden()
+    if request.method=='POST':
+        d=await json_body(request); tid=d.get('id')
+        if tid: await db_execute("UPDATE tasks SET title=%s,task_type=%s,reward_amount=%s,task_link=%s,enabled=%s,updated_at=CURRENT_TIMESTAMP WHERE id=%s",(d.get('title'),d.get('task_type','link'),float(d.get('reward_amount') or 0),d.get('task_link'),bool(d.get('enabled',True)),int(tid)))
+        else: await db_execute("INSERT INTO tasks(title,task_type,reward_amount,task_link,enabled,created_by) VALUES(%s,%s,%s,%s,%s,%s)",(d.get('title'),d.get('task_type','link'),float(d.get('reward_amount') or 0),d.get('task_link'),bool(d.get('enabled',True)),uid))
+    else: await db_execute("DELETE FROM tasks WHERE id=%s",(int(request.match_info['task_id']),))
+    return web.json_response({'ok':True})
+
+async def api_v20_admin_channels(request):
+    u=require_admin(request); uid=int(u['id'])
+    if not (uid==OWNER_ID or has_perm(uid,'can_manage_notifications') or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden()
+    if request.method=='POST':
+        d=await json_body(request); cid=int(d.get('chat_id')); await db_execute("INSERT INTO notification_channels(chat_id,title,enabled) VALUES(%s,%s,%s) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title,enabled=EXCLUDED.enabled,updated_at=CURRENT_TIMESTAMP",(cid,d.get('title'),bool(d.get('enabled',True))))
+    else: await db_execute("DELETE FROM notification_channels WHERE id=%s",(int(request.match_info['channel_id']),))
+    return web.json_response({'ok':True})
+
+async def api_v20_admin_withdraw(request):
+    u=require_admin(request); uid=int(u['id'])
+    if not (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw')): raise web.HTTPForbidden()
+    rid=int(request.match_info['request_id']); d=await json_body(request); status=str(d.get('status') or '').lower()
+    if status not in {'approved','rejected'}: raise web.HTTPBadRequest(text='Invalid status')
+    r=await db_fetchone("SELECT * FROM withdraw_requests WHERE id=%s",(rid,));
+    if not r or r.get('status')!='pending': raise web.HTTPBadRequest(text='Request already processed')
+    if status=='approved':
+        w=await db_fetchone("SELECT balance FROM wallet WHERE user_id=%s",(int(r['user_id']),)) or {'balance':0}
+        if float(w['balance'] or 0)<float(r['amount']): raise web.HTTPBadRequest(text='Insufficient user balance')
+        await db_execute("UPDATE wallet SET balance=balance-%s,total_withdraw=total_withdraw+%s,updated_at=CURRENT_TIMESTAMP WHERE user_id=%s",(r['amount'],r['amount'],r['user_id']))
+        await db_execute("INSERT INTO transactions(user_id,type,amount,reference_type,reference_id,note) VALUES(%s,'debit',%s,'withdraw',%s,'Withdraw approved')",(r['user_id'],-abs(float(r['amount'])),str(rid)))
+    await db_execute("UPDATE withdraw_requests SET status=%s,admin_note=%s,reviewed_by=%s,reviewed_at=CURRENT_TIMESTAMP WHERE id=%s",(status,d.get('note'),uid,rid))
+    return web.json_response({'ok':True})
+
+
 async def api_admin_drafts(request):
     require_admin(request, "can_manage_content")
     rows = await db_fetchall(
@@ -1225,7 +1461,7 @@ async def api_admin_drafts(request):
 
 
 async def api_admin_video_save(request):
-    require_admin(request, "can_manage_content")
+    require_admin_any(request, "can_manage_packages", "can_manage_content")
     d = await json_body(request)
     required = ["id", "video_code", "title"]
     if any(not str(d.get(k, "")).strip() for k in required):
@@ -1266,14 +1502,14 @@ async def api_admin_video_save(request):
 
 
 async def api_admin_video_rebroadcast(request):
-    require_admin(request, "can_manage_content")
+    require_admin_any(request, "can_manage_packages", "can_manage_content")
     vid = request.match_info["video_id"]
     await db_execute("UPDATE videos SET broadcast_enabled=TRUE,broadcast_sent=FALSE WHERE id=%s", (vid,))
     return web.json_response({"ok": True})
 
 
 async def api_admin_video_delete(request):
-    require_admin(request, "can_manage_content")
+    require_admin_any(request, "can_manage_packages", "can_manage_content")
     await db_execute("DELETE FROM videos WHERE id=%s", (request.match_info["video_id"],))
     return web.json_response({"ok": True})
 
@@ -1307,6 +1543,11 @@ async def api_admin_viral_delete(request):
 async def api_admin_settings_save(request):
     require_admin(request, "can_manage_settings")
     d = await json_body(request)
+    _admin_user = request_user(request) or {}
+    if int(_admin_user.get("id", 0) or 0) != OWNER_ID:
+        current = await get_settings()
+        for _k in ("tutorial_enabled","tutorial_video_code","tutorial_caption","tutorial_button_text"):
+            d[_k] = current.get(_k)
     fields = [
         "brand_name", "brand_subtitle", "hero_text", "nav_home", "nav_fav", "nav_unlock", "nav_viral", "nav_profile",
         "online_label", "show_online", "web_app_url", "bot_menu_button_text", "welcome_text", "watch_button_text",
@@ -1362,6 +1603,7 @@ async def api_admin_settings_save(request):
         )
         await sync_menu_button()
         saved = await get_settings()
+        await db_execute("UPDATE ad_settings SET mode=%s,adsgram_enabled=%s,adsgram_block_id=%s,adsgram_required=%s,monetag_enabled=%s,monetag_zone_id=%s,monetag_wait_seconds=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'", (saved.get('monetization_mode') or 'both',bool(saved.get('adsgram_enabled',True)),saved.get('adsgram_block_id'),int(saved.get('required_ads_default') or 1),bool(saved.get('monetag_enabled',True)),saved.get('monetag_zone_id'),int(saved.get('monetag_wait_seconds') or 20)))
         return web.Response(text=json.dumps({"ok": True, "settings": saved}, default=str, ensure_ascii=False), content_type="application/json")
     except web.HTTPException:
         raise
@@ -1373,14 +1615,14 @@ async def api_admin_settings_save(request):
 async def api_admin_admins(request):
     u = require_admin(request, "can_manage_admins")
     if request.method == "GET":
-        rows = await db_fetchall("SELECT user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins,created_at FROM admin_users ORDER BY created_at")
+        rows = await db_fetchall("SELECT user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins,can_manage_packages,can_manage_withdraw,can_manage_support,can_manage_tasks,can_manage_notifications,can_view_analytics,created_at FROM admin_users ORDER BY created_at")
         return web.Response(text=json.dumps({"owner_id": OWNER_ID, "admins": rows}, default=str, ensure_ascii=False), content_type="application/json")
     d = await json_body(request)
     uid = int(d.get("user_id", 0))
     if uid <= 0 or uid == OWNER_ID: raise web.HTTPBadRequest(text="Invalid admin user id")
-    vals = (uid, str(d.get("role") or "admin"), str(d.get("display_name") or "Admin")[:255], bool(d.get("can_manage_content",True)), bool(d.get("can_manage_settings",True)), bool(d.get("can_broadcast",True)), bool(d.get("can_manage_users",True)), bool(d.get("can_manage_admins",False)))
-    await db_execute("""INSERT INTO admin_users(user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins)
-      VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(user_id) DO UPDATE SET role=EXCLUDED.role,display_name=EXCLUDED.display_name,can_manage_content=EXCLUDED.can_manage_content,can_manage_settings=EXCLUDED.can_manage_settings,can_broadcast=EXCLUDED.can_broadcast,can_manage_users=EXCLUDED.can_manage_users,can_manage_admins=EXCLUDED.can_manage_admins""", vals)
+    vals = (uid, str(d.get("role") or "admin"), str(d.get("display_name") or "Admin")[:255], bool(d.get("can_manage_content",True)), bool(d.get("can_manage_settings",True)), bool(d.get("can_broadcast",True)), bool(d.get("can_manage_users",True)), bool(d.get("can_manage_admins",False)), bool(d.get("can_manage_packages",True)), bool(d.get("can_manage_withdraw",False)), bool(d.get("can_manage_support",False)), bool(d.get("can_manage_tasks",False)), bool(d.get("can_manage_notifications",False)), bool(d.get("can_view_analytics",True)))
+    await db_execute("""INSERT INTO admin_users(user_id,role,display_name,can_manage_content,can_manage_settings,can_broadcast,can_manage_users,can_manage_admins,can_manage_packages,can_manage_withdraw,can_manage_support,can_manage_tasks,can_manage_notifications,can_view_analytics)
+      VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(user_id) DO UPDATE SET role=EXCLUDED.role,display_name=EXCLUDED.display_name,can_manage_content=EXCLUDED.can_manage_content,can_manage_settings=EXCLUDED.can_manage_settings,can_broadcast=EXCLUDED.can_broadcast,can_manage_users=EXCLUDED.can_manage_users,can_manage_admins=EXCLUDED.can_manage_admins,can_manage_packages=EXCLUDED.can_manage_packages,can_manage_withdraw=EXCLUDED.can_manage_withdraw,can_manage_support=EXCLUDED.can_manage_support,can_manage_tasks=EXCLUDED.can_manage_tasks,can_manage_notifications=EXCLUDED.can_manage_notifications,can_view_analytics=EXCLUDED.can_view_analytics""", vals)
     await refresh_admin_cache()
     return web.json_response({"ok":True})
 
@@ -1395,7 +1637,7 @@ async def api_admin_admin_delete(request):
 
 
 async def api_admin_users(request):
-    require_admin(request, "can_manage_users")
+    require_admin_any(request, "can_manage_support", "can_manage_users")
     rows = await db_fetchall("""
         SELECT u.user_id,u.username,u.first_name,u.last_name,u.is_active,u.last_seen_at,u.created_at,
           COALESCE((SELECT COUNT(*) FROM video_views vv WHERE vv.user_id=u.user_id),0) AS opened_unique,
@@ -1550,6 +1792,17 @@ async def start_web_server():
     app.router.add_post("/api/views/{video_id}", api_increment_view)
     app.router.add_get("/api/resolve-start/{code}", api_resolve_start)
     app.router.add_get("/api/profile", api_profile)
+    app.router.add_get("/api/v20/wallet", api_v20_wallet)
+    app.router.add_post("/api/v20/withdraw", api_v20_withdraw)
+    app.router.add_get("/api/v20/tasks", api_v20_tasks)
+    app.router.add_post("/api/v20/tasks/{task_id}/complete", api_v20_task_complete)
+    app.router.add_get("/api/v20/admin/config", api_v20_admin_config)
+    app.router.add_post("/api/v20/admin/config", api_v20_admin_config)
+    app.router.add_post("/api/v20/admin/tasks", api_v20_admin_tasks)
+    app.router.add_delete("/api/v20/admin/tasks/{task_id}", api_v20_admin_tasks)
+    app.router.add_post("/api/v20/admin/channels", api_v20_admin_channels)
+    app.router.add_delete("/api/v20/admin/channels/{channel_id}", api_v20_admin_channels)
+    app.router.add_post("/api/v20/admin/withdraw/{request_id}", api_v20_admin_withdraw)
     app.router.add_get("/api/videos/{video_id}/social", api_video_social)
     app.router.add_post("/api/videos/{video_id}/favorite", api_toggle_favorite)
     app.router.add_post("/api/videos/{video_id}/reaction", api_toggle_reaction)
