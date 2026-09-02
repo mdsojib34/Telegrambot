@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Viral Video Hub — Telegram Video Access</title>
+<!-- Telegram Mini App SDK -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+<script src="https://libtl.com/sdk.js" data-zone="11404425" data-sdk="show_11404425"></script>
+
+<style>
+/* =========================================================
+   CORE DESIGN SYSTEM
+   ========================================================= */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#070a13;
+  --surface:#0f1422;
+  --surface-2:#171d30;
+  --border:#28304a;
+  --text:#f8f9ff;
+  --muted:#969db8;
+  --primary:#7a4dff;
+  --primary-2:#4f7cff;
+  --accent:#d85cff;
+  --success:#20d889;
+  --warning:#ffc45e;
+  --danger:#ff5d79;
+  --grad-hero:linear-gradient(135deg,#4f46e5 0%,#7c3aed 52%,#9333ea 100%);
+  --grad-unlock:linear-gradient(135deg,#6546ff 0%,#9b4dff 100%);
+  --grad-card:linear-gradient(160deg,rgba(24,29,48,.96) 0%,rgba(12,16,29,.98) 100%);
+  --shadow-glow:0 18px 52px -20px rgba(124,77,255,.8);
+  --shadow-card:0 8px 25px -5px rgba(0,0,0,0.4);
+}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;overflow-x:hidden}
+body{padding-bottom:100px}
+
+/* LOADING SCREEN */
+#app-loader{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spinner{width:50px;height:50px;border:4px solid var(--surface-2);border-top:4px solid var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HEADER */
+.app-header{position:sticky;top:0;z-index:100;backdrop-filter:blur(18px);background:rgba(11,13,23,.85);border-bottom:1px solid var(--border)}
+.app-header .row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800}
+.brand-logo{width:34px;height:34px;border-radius:10px;background:var(--grad-hero);display:grid;place-items:center;font-size:16px;box-shadow:var(--shadow-glow)}
+.header-actions{display:flex;align-items:center;gap:8px}
+.user-chip{display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:var(--surface)}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:var(--grad-hero);display:grid;place-items:center;font-size:11px;font-weight:700;overflow:hidden}
+.user-avatar img{width:100%;height:100%;object-fit:cover}
+.admin-badge{font-size:8px;padding:2px 5px;border-radius:4px;background:linear-gradient(135deg,#ff5c9d,#ffb547);color:#1a1035;font-weight:800;margin-left:4px}
+.lang-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer}
+
+/* SEARCH & CATEGORY */
+.search-container{padding:10px 16px}
+.search-box{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);padding:10px 15px;border-radius:14px}
+.search-box input{background:none;border:none;color:#fff;font-size:14px;width:100%;outline:none}
+.cat-tabs{display:flex;gap:8px;overflow-x:auto;padding:0 16px 15px;scrollbar-width:none}
+.cat-tabs::-webkit-scrollbar{display:none}
+.tab{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;font-size:13px;white-space:nowrap;transition:0.3s;cursor:pointer}
+.tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
+
+/* HERO SECTION */
+.hero-card{background:var(--grad-hero);padding:20px;border-radius:24px;margin:0 16px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow-glow)}
+.hero-card h2{font-size:20px;margin-bottom:4px}
+.hero-card p{font-size:12px;opacity:0.9}
+.hero-stats{display:flex;gap:10px;margin-top:15px}
+.stat-pill{background:rgba(255,255,255,0.15);padding:8px 12px;border-radius:12px;flex:1;text-align:center}
+.stat-pill b{display:block;font-size:16px}
+.stat-pill span{font-size:9px;text-transform:uppercase;opacity:0.8}
+
+/* VIEWS */
+.view{display:none;padding:0 16px}
+.view.active{display:block;animation:fadeIn 0.4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.page-title{font-size:18px;font-weight:800;margin:20px 0 15px;display:flex;align-items:center;gap:8px}
+
+/* GRID & CARDS */
+.grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:12px}
+.card{background:var(--grad-card);border:1px solid var(--border);border-radius:18px;overflow:hidden;position:relative;transition:0.2s;cursor:pointer;box-shadow:var(--shadow-card)}
+.card:active{transform:scale(0.97)}
+.card-thumb{aspect-ratio:16/10;position:relative;background:#000}
+.card-thumb img{width:100%;height:100%;object-fit:cover}
+.card-badge{position:absolute;top:8px;left:8px;padding:3px 7px;border-radius:6px;font-size:9px;font-weight:700;backdrop-filter:blur(6px)}
+.badge-locked{background:rgba(0,0,0,0.6);color:var(--warning)}
+.badge-unlocked{background:rgba(34,197,138,0.85);color:#fff}
+.card-play{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,0.2)}
+.play-btn-circle{width:36px;height:36px;background:rgba(255,255,255,0.25);backdrop-filter:blur(4px);border-radius:50%;display:grid;place-items:center}
+.card-body{padding:10px}
+.card-cat{font-size:9px;color:var(--primary-2);text-transform:uppercase;font-weight:700;margin-bottom:2px}
+.card-title{font-size:13px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:34px}
+.card-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted)}
+.card-share-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:8px;font-size:10px;cursor:pointer}
+
+/* VIRAL LINKS CARD */
+.viral-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:15px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:0.2s}
+.viral-card:hover{border-color:var(--primary)}
+.viral-info{display:flex;align-items:center;gap:12px;overflow:hidden}
+.viral-icon{width:42px;height:42px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-size:20px;flex-shrink:0}
+.viral-title{font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viral-url{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+
+/* MODAL / BOTTOM SHEET */
+.modal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);display:none;align-items:flex-end}
+.modal.open{display:flex}
+.modal-sheet{background:var(--bg);width:100%;max-height:92vh;border-radius:28px 28px 0 0;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.4s cubic-bezier(0,0,0.2,1)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-header{padding:16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.sheet-content{padding:16px;overflow-y:auto;flex:1}
+
+/* METRICS ROW */
+.detail-metrics-row{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin:15px 0}
+.metric-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px 8px;text-align:center;box-shadow:var(--shadow-card)}
+.metric-box .metric-icon{font-size:16px;margin-bottom:2px}
+.metric-box .metric-val{font-size:13px;font-weight:800;color:#fff}
+.metric-box .metric-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:14px;font-weight:700;font-size:14px;width:100%;border:none;color:#fff;transition:0.2s;cursor:pointer}
+.btn:active{transform:scale(0.96)}
+.btn-p{background:var(--grad-hero);box-shadow:var(--shadow-glow)}
+.btn-s{background:var(--grad-unlock)}
+.btn-g{background:var(--surface-2);border:1px solid var(--border)}
+.btn-d{background:var(--danger)}
+.btn:disabled{opacity:0.6;pointer-events:none}
+
+.detail-actions-row{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin-top:15px}
+.detail-actions-row .btn{padding:10px 8px;font-size:12px;border-radius:12px}
+
+/* COMMENTS */
+.comment-list{margin-top:15px;display:flex;flex-direction:column;gap:10px}
+.comment-item{background:var(--surface);border:1px solid var(--border);padding:12px;border-radius:16px;box-shadow:var(--shadow-card)}
+.comment-user-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.comment-avatar{width:28px;height:28px;border-radius:50%;background:var(--grad-hero);display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+.comment-info{display:flex;flex-direction:column}
+.comment-author{font-size:12px;font-weight:700;color:#fff}
+.comment-time{font-size:9px;color:var(--muted)}
+.comment-text{font-size:13px;color:var(--text);padding-left:38px;line-height:1.4}
+
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.animate-beat { animation: heartBeat 0.3s ease; }
+
+/* ADMIN */
+.admin-card{background:var(--surface);border:1px solid var(--border);padding:15px;border-radius:18px;margin-bottom:15px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;margin-bottom:5px;color:var(--muted)}
+.form-group input, .form-group select, .form-group textarea{width:100%;background:var(--bg);border:1px solid var(--border);padding:10px;border-radius:10px;color:#fff;font-family:inherit}
+.thumb-prev{width:100%;aspect-ratio:16/9;border:2px dashed var(--border);border-radius:12px;margin-top:5px;display:grid;place-items:center;overflow:hidden}
+.thumb-prev img{width:100%;height:100%;object-fit:cover}
+.admin-list-item{display:flex;align-items:center;justify-content:between;background:var(--surface);border:1px solid var(--border);padding:10px 12px;border-radius:12px;margin-bottom:8px}
+.admin-list-info{display:flex;align-items:center;gap:10px;overflow:hidden}
+.admin-list-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;background:#000}
+
+/* NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(11,13,23,0.95);backdrop-filter:blur(15px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:10px 5px calc(10px + env(safe-area-inset-bottom));z-index:150}
+.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);font-size:10px;font-weight:600;flex:1;background:none;border:none;cursor:pointer}
+.nav-item.active{color:var(--primary)}
+.nav-item i{font-size:18px;font-style:normal}
+
+/* TOAST */
+#toast-container{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:2000;width:90%;max-width:400px;pointer-events:none}
+.toast{background:var(--surface-2);border:1px solid var(--border);padding:12px 16px;border-radius:12px;margin-bottom:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;align-items:center;gap:10px;animation:toastIn 0.3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:none}}
+
+.hidden{display:none}
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty-state i{font-size:40px;display:block;margin-bottom:10px}
+
+/* =========================================================
+   NEW PROFILE PAGE STYLES (WHITE THEME & PREMIUM UI)
+   ========================================================= */
+#view-profile {
+  background-color: #f8fafc;
+  min-height: calc(100vh - 60px);
+  padding: 20px 16px 40px 16px;
+  color: #1e293b;
+}
+
+.profile-container {
+  max-width: 500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-hero-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 16px auto;
+  padding: 4px;
+  border-radius: 50%;
+  background: var(--grad-hero);
+  box-shadow: 0 8px 25px -5px rgba(124, 92, 255, 0.35);
+}
+
+.profile-avatar-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 36px;
+  font-weight: 800;
+  color: #7c5cff;
+}
+
+.profile-avatar-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profile-username {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.profile-id-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.profile-menu-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.03);
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.profile-menu-item:last-child {
+  border-bottom: none;
+}
+
+.profile-menu-item:active {
+  background: #f8fafc;
+}
+
+.profile-menu-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-menu-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+
+.profile-menu-arrow {
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* V3 PREMIUM HOME */
+body{background:radial-gradient(circle at 15% -10%,rgba(91,55,220,.18),transparent 32%),radial-gradient(circle at 100% 10%,rgba(79,124,255,.10),transparent 28%),var(--bg)}
+.app-header{background:rgba(7,10,19,.78);border-bottom:1px solid rgba(138,118,255,.16);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.brand-logo{width:42px;height:42px;border-radius:13px;font-size:18px}.brand-title{font-size:15px;font-weight:850;letter-spacing:.2px}.brand-sub{font-size:8px;color:#a9aee0;font-weight:700;letter-spacing:1px}
+.online-pill{display:flex;align-items:center;gap:7px;background:rgba(32,216,137,.09);border:1px solid rgba(32,216,137,.22);padding:7px 10px;border-radius:999px;font-size:11px;font-weight:800;color:#8ff2c1;white-space:nowrap}.online-dot{width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 5px rgba(32,216,137,.10),0 0 12px rgba(32,216,137,.7);animation:pulseOnline 1.8s infinite}@keyframes pulseOnline{50%{box-shadow:0 0 0 8px rgba(32,216,137,0),0 0 14px rgba(32,216,137,.85)}}
+.search-box{background:linear-gradient(145deg,rgba(20,25,42,.96),rgba(12,16,29,.96));border-color:rgba(132,112,255,.22);box-shadow:inset 0 1px rgba(255,255,255,.025),0 8px 24px rgba(0,0,0,.15)}
+.search-box:focus-within{border-color:rgba(122,77,255,.7);box-shadow:0 0 0 3px rgba(122,77,255,.10)}
+.tab{background:rgba(20,25,42,.82);border-color:rgba(131,117,219,.22);color:#b7bdd3;font-weight:700}.tab.active{background:linear-gradient(135deg,#744cff,#8c4eff);box-shadow:0 10px 28px -12px rgba(124,77,255,.9);color:white}
+.hero-card{background:linear-gradient(135deg,rgba(71,54,199,.98),rgba(115,59,224,.98) 55%,rgba(141,62,226,.95));border:1px solid rgba(255,255,255,.10);box-shadow:0 22px 55px -25px rgba(115,59,224,.9)}
+.hero-card:before{content:'';position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.07);right:-65px;top:-95px}.hero-card:after{content:'';position:absolute;width:110px;height:110px;border-radius:50%;border:22px solid rgba(255,255,255,.045);right:25px;bottom:-70px}.hero-card>*{position:relative;z-index:1}
+.hero-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.hero-badge{font-size:10px;font-weight:800;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.10)}
+.stat-pill{background:rgba(5,7,18,.18);border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(10px)}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px}.section-head h3{font-size:18px}.section-head span{font-size:11px;color:#9aa1bc}
+.grid{grid-template-columns:1fr;gap:12px}.card{display:grid;grid-template-columns:118px 1fr;background:linear-gradient(145deg,rgba(19,24,41,.97),rgba(11,15,27,.98));border-color:rgba(126,111,213,.18);border-radius:20px;min-height:124px}.card-thumb{aspect-ratio:auto;height:100%;min-height:124px}.card-body{padding:13px 12px 4px}.card-title{font-size:14px;height:auto;min-height:37px}.card-cat{font-size:10px}.card>div:last-child{grid-column:2;padding:0 12px 12px!important}.play-btn-circle{background:rgba(99,70,255,.86);box-shadow:0 8px 22px rgba(72,48,190,.38)}
+.video-watch-chip{background:linear-gradient(135deg,#151a2b,#111727);border:1px solid rgba(122,77,255,.30);color:#fff;padding:7px 10px;border-radius:10px;font-size:10px;font-weight:800}
+.bottom-nav{left:14px;right:14px;bottom:10px;border:1px solid rgba(123,108,215,.18);border-radius:24px;background:rgba(11,15,27,.92);box-shadow:0 22px 50px rgba(0,0,0,.42);padding:11px 6px calc(11px + env(safe-area-inset-bottom));overflow:hidden}.nav-item{font-size:9px;gap:5px}.nav-item i{font-size:20px}.nav-item.active{color:#9a6cff;text-shadow:0 0 14px rgba(154,108,255,.4)}
+.admin-card{background:linear-gradient(145deg,rgba(18,23,39,.98),rgba(11,15,27,.98));border-color:rgba(126,111,213,.20)}
+.dashboard-stat{padding:14px;border-radius:18px;background:linear-gradient(145deg,#141a2c,#0f1423);border:1px solid rgba(125,110,215,.18)}.dashboard-stat .value{font-size:24px;font-weight:900;margin-top:5px}.dashboard-stat .label{font-size:10px;color:var(--muted)}
+.setting-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.setting-grid .form-group{margin:0}.full{grid-column:1/-1}
+@media(min-width:700px){.grid{grid-template-columns:repeat(2,1fr)}.view{max-width:980px;margin:auto}.search-container,.cat-tabs{max-width:1012px;margin:auto}.app-header .row{max-width:1012px;margin:auto}}
+
+
+/* ===== V8 PREMIUM EXPERIENCE ===== */
+:root{--v8-purple:#7c4dff;--v8-indigo:#4f6dff;--v8-pink:#ff5f8f;--v8-cyan:#49d7ff}
+body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),transparent 55%),radial-gradient(700px 500px at 105% 12%,rgba(73,215,255,.10),transparent 50%),#070a13}
+.hero-card{padding:20px;border-radius:26px;background:linear-gradient(135deg,#34238c 0%,#6440df 52%,#8d3dd8 100%);box-shadow:0 28px 70px rgba(73,45,170,.38);overflow:hidden}.hero-card h2{font-size:23px;line-height:1.25}.hero-card p{color:rgba(255,255,255,.78);line-height:1.55}.hero-stats{gap:8px}.stat-pill{border-radius:14px;padding:10px 12px}.stat-pill b{font-size:18px}
+.v8-video-card{grid-template-columns:126px 1fr!important;border-radius:22px!important;background:linear-gradient(145deg,rgba(22,27,47,.98),rgba(9,13,25,.99))!important;box-shadow:0 16px 35px rgba(0,0,0,.26);overflow:hidden;position:relative}.v8-video-card .card-thumb{min-height:142px}.v8-video-card .card-title{font-size:15px;line-height:1.35;font-weight:800}.v8-top-badges{position:absolute;inset:9px 8px auto 8px;display:flex;justify-content:space-between;gap:6px}.v8-top-badges>span{font-size:8px;font-weight:900;padding:5px 7px;border-radius:999px;backdrop-filter:blur(8px)}.v8-hot{background:linear-gradient(135deg,#ff6a57,#ff3d8d);color:white}.badge-locked,.badge-unlocked{position:static!important}.v8-card-social{display:flex;gap:10px;margin-top:9px;color:#9299b7;font-size:10px;font-weight:700}.v8-card-actions{grid-column:1/-1!important;display:grid!important;grid-template-columns:1fr 42px 42px;gap:8px;padding:10px 12px 12px!important;border-top:1px solid rgba(255,255,255,.05)}.v8-watch-btn{border:0;border-radius:13px;padding:11px 12px;background:linear-gradient(135deg,var(--v8-purple),#9c4fff);color:white;font-weight:900;box-shadow:0 10px 25px rgba(124,77,255,.3)}.v8-icon-btn{border:1px solid rgba(255,255,255,.08);border-radius:13px;background:#12182a;color:white;font-size:17px}
+.profile-container{max-width:620px}.profile-hero-card{background:linear-gradient(150deg,#191f38,#101527 55%,#24183c);border:1px solid rgba(145,121,255,.22);color:white!important;box-shadow:0 25px 65px rgba(0,0,0,.3)}.profile-name{color:white!important}.profile-username{color:#aeb5d5!important}.profile-id-pill{background:rgba(124,77,255,.12)!important;border-color:rgba(124,77,255,.25)!important;color:#c9bdff!important}.profile-avatar-inner{border-color:#8c6bff!important;box-shadow:0 0 0 7px rgba(124,77,255,.08),0 16px 35px rgba(0,0,0,.25)}.v8-profile-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0}.v8-profile-stats>div{background:linear-gradient(145deg,#141a2e,#0d1221);border:1px solid rgba(136,113,255,.16);border-radius:17px;padding:14px 8px;text-align:center}.v8-profile-stats b{display:block;font-size:22px;color:white}.v8-profile-stats span{display:block;margin-top:4px;font-size:9px;color:#959dbb}.profile-menu-card{background:#101625!important;border:1px solid rgba(136,113,255,.14)!important}.profile-menu-item{color:white!important;border-color:rgba(255,255,255,.06)!important}.profile-menu-icon{background:#171d31!important;border-color:rgba(255,255,255,.06)!important}.v8-recent-wrap{margin-top:14px;background:#101625;border:1px solid rgba(136,113,255,.14);border-radius:20px;padding:15px}.v8-recent-wrap h4{margin-bottom:10px}.v8-recent-list{display:grid;gap:9px}.v8-recent-item{display:flex;gap:10px;align-items:center;background:#0c1120;border-radius:13px;padding:8px}.v8-recent-item img{width:52px;height:52px;object-fit:cover;border-radius:11px;background:#080b13}.v8-recent-item b{display:block;font-size:12px}.v8-recent-item span{font-size:9px;color:#8ff2c1}
+.admin-card{border-radius:22px!important;box-shadow:0 18px 45px rgba(0,0,0,.22)}.dashboard-stat{min-height:92px;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(145deg,#171d33,#0d1222)!important}.dashboard-stat .value{background:linear-gradient(135deg,#fff,#b7a8ff);-webkit-background-clip:text;color:transparent}.form-group input,.form-group textarea,.form-group select{border-radius:13px!important;background:#0b1020!important;border-color:rgba(135,114,255,.18)!important}
+.modal-sheet{background:linear-gradient(180deg,#101526,#080c16)!important}.detail-metrics-row .metric-box{background:#12182a!important;border:1px solid rgba(126,111,213,.15);border-radius:16px}.comment-item{background:#111728!important;border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:11px;margin-top:9px}.comment-avatar{background:linear-gradient(135deg,#7048ff,#a14cff)!important}.v8-start-ready{position:fixed;inset:0;background:rgba(5,7,13,.96);backdrop-filter:blur(12px);z-index:9999;display:grid;place-items:center;padding:22px}.v8-ready-card{width:min(100%,390px);padding:28px 22px;border-radius:28px;text-align:center;background:linear-gradient(145deg,#161c31,#0c1120);border:1px solid rgba(139,116,255,.25);box-shadow:0 30px 90px rgba(0,0,0,.55)}.v8-ready-icon{font-size:52px}.v8-ready-badge{display:inline-block;margin:12px 0 8px;padding:5px 10px;border-radius:999px;background:rgba(32,216,137,.12);color:#8ff2c1;font-size:9px;font-weight:900}.v8-ready-card h2{font-size:22px}.v8-ready-card p{color:#98a0bc;line-height:1.6;margin:10px 0 18px}.v8-ready-card button{width:100%;border:0;border-radius:14px;padding:13px;background:linear-gradient(135deg,#744cff,#a14cff);color:white;font-weight:900;margin-top:8px}.v8-ready-card button.ghost{background:#12182a;color:#b8bfd7}
+
+/* ===== V15 AUTO THUMBNAIL + CAPTION OVERLAY ===== */
+.thumb-caption-overlay{position:absolute;left:8px;right:8px;bottom:8px;z-index:5;padding:7px 9px;border-radius:11px;background:linear-gradient(90deg,rgba(4,7,15,.86),rgba(22,14,45,.78));border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(5px);font-size:10px;font-weight:900;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.thumb-caption-overlay span{background:linear-gradient(90deg,#ffffff 0%,#ffd166 48%,#ff78b7 100%);-webkit-background-clip:text;background-clip:text;color:transparent}.draft-card{background:linear-gradient(145deg,#151b2d,#0c1120);border:1px solid rgba(124,77,255,.2);border-radius:16px;padding:10px;margin:9px 0;display:grid;grid-template-columns:112px 1fr;gap:10px;align-items:center}.draft-thumb{width:112px;aspect-ratio:16/9;object-fit:cover;border-radius:11px;background:#060910}.draft-meta{min-width:0}.draft-meta b{font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.draft-meta small{color:var(--muted);font-size:9px}.draft-use{margin-top:7px;width:auto!important;padding:7px 10px!important;font-size:10px!important}.thumb-preview-wrap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#05070d}.thumb-preview-wrap>img{width:100%;height:100%;object-fit:cover;object-position:center}.thumb-prev-text{position:absolute;left:8px;right:8px;bottom:8px;padding:7px 9px;border-radius:10px;background:rgba(7,10,19,.82);font-size:10px;font-weight:900;line-height:1.3}.thumb-prev-text span{background:linear-gradient(90deg,#fff,#ffd166,#ff78b7);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ===== V18 PREMIUM PHONE-GALLERY HOME ===== */
+#view-home{padding:0 14px 18px}
+#view-home .hero-card{margin:0 0 16px;border-radius:26px;padding:18px;background:linear-gradient(145deg,#22184d 0%,#5330bb 48%,#8a3ce0 100%);border:1px solid rgba(255,255,255,.10);box-shadow:0 22px 60px rgba(63,38,145,.34)}
+#view-home .hero-card h2{font-size:21px;font-weight:900;letter-spacing:-.2px}
+#view-home .hero-card p{font-size:11px;line-height:1.55;color:rgba(255,255,255,.78)}
+#main-grid.gallery-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.gallery-card{position:relative;background:linear-gradient(160deg,#151a2c,#0b101d);border:1px solid rgba(138,118,255,.18);border-radius:18px;overflow:hidden;min-width:0;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+.gallery-thumb{position:relative;aspect-ratio:9/12;background:#090c14;overflow:hidden;cursor:pointer}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-thumb:after{content:'';position:absolute;inset:auto 0 0;height:54%;background:linear-gradient(transparent,rgba(4,6,12,.92))}
+.gallery-play{position:absolute;inset:0;display:grid;place-items:center;z-index:2;pointer-events:none}
+.gallery-play span{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18);font-size:16px;padding-left:2px}
+.gallery-badges{position:absolute;left:8px;right:8px;top:8px;z-index:3;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.gallery-badge{font-size:8px;font-weight:900;padding:5px 7px;border-radius:999px;background:rgba(8,10,20,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);white-space:nowrap}
+.gallery-badge.hot{background:linear-gradient(135deg,#ff693d,#ff3f84);color:#fff;border:0}
+.gallery-body{padding:10px 10px 8px;min-width:0}
+.gallery-title{font-size:12px;font-weight:850;line-height:1.35;color:#fff;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px}
+.gallery-desc{font-size:9px;color:#8f98b5;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-meta{display:flex;gap:8px;align-items:center;margin-top:7px;font-size:8px;color:#8e96b0}
+.gallery-actions{display:grid;grid-template-columns:1fr 38px;gap:6px;padding:0 9px 9px}
+.gallery-watch{border:0;border-radius:11px;background:linear-gradient(135deg,#6f4cff,#a33cff);color:#fff;font-size:10px;font-weight:900;padding:9px 7px;min-width:0}
+.gallery-share{border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#12182a;color:#fff;font-size:15px}
+@media(min-width:600px){#main-grid.gallery-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.gallery-thumb{aspect-ratio:4/5}}
+@media(min-width:900px){#main-grid.gallery-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* ===== V19 COMPACT GALLERY ===== */
+#main-grid.gallery-grid{gap:8px}
+.gallery-card{border-radius:14px}
+.gallery-thumb{aspect-ratio:4/5}
+.gallery-play span{width:34px;height:34px;font-size:13px}
+.gallery-badges{left:6px;right:6px;top:6px}.gallery-badge{font-size:7px;padding:4px 6px}
+.gallery-body{padding:7px 8px 6px}.gallery-title{font-size:11px;min-height:29px}.gallery-desc{font-size:8px;margin-top:3px}.gallery-meta{font-size:7px;gap:6px;margin-top:5px}
+.gallery-actions{grid-template-columns:1fr 34px;gap:5px;padding:0 7px 7px}.gallery-watch{font-size:9px;padding:8px 5px}.gallery-share{font-size:13px;border-radius:9px}
+@media(max-width:360px){#main-grid.gallery-grid{gap:7px}.gallery-title{font-size:10.5px}.gallery-body{padding:6px 7px 5px}}
+
+.bot-role-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.bot-role-card{background:linear-gradient(145deg,#141a2e,#0d1221);border:1px solid rgba(135,114,255,.18);border-radius:17px;padding:13px}
+.bot-role-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.bot-role-name{font-weight:900;font-size:13px}.bot-role-sub{font-size:9px;color:var(--muted);margin-top:3px}.bot-status-dot{width:9px;height:9px;border-radius:50%;background:#64748b}.bot-status-dot.ok{background:#20d889;box-shadow:0 0 12px rgba(32,216,137,.65)}
+
+
+/* ===== V19.2 PREMIUM VIDEO DETAILS ===== */
+#modal-detail .modal-sheet{background:linear-gradient(180deg,#091224 0%,#07101f 100%);border:1px solid rgba(116,96,230,.16);border-radius:28px 28px 0 0;overflow:hidden}
+#modal-detail .sheet-header{padding:17px 20px;background:linear-gradient(180deg,rgba(12,24,45,.98),rgba(9,18,35,.96));border-bottom:1px solid rgba(132,111,255,.16)}
+#modal-detail .sheet-content{padding:14px 20px 30px}
+#modal-detail #md-media-container{border-radius:22px!important;box-shadow:0 18px 50px rgba(0,0,0,.36)!important;border:1px solid rgba(255,255,255,.06);position:relative}
+.v192-media-shell{width:100%;height:100%;position:relative;background:#000}
+.v192-media-shell>img{width:100%;height:100%;object-fit:cover}
+.v192-demo-badge,.v192-duration,.v192-protected{position:absolute;z-index:2;background:rgba(7,12,22,.78);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.08);color:#fff}
+.v192-demo-badge{left:14px;top:14px;padding:7px 11px;border-radius:11px;font-weight:800;font-size:11px}
+.v192-duration{right:14px;top:14px;padding:7px 10px;border-radius:11px;font-weight:800;font-size:11px}
+.v192-protected{left:14px;bottom:14px;padding:7px 11px;border-radius:11px;font-size:10px}
+.v192-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:62px;height:62px;border-radius:50%;display:grid;place-items:center;background:rgba(9,8,17,.68);border:1px solid rgba(255,255,255,.1);font-size:25px;color:#fff}
+.v192-title-wrap{margin-top:17px}.v192-title-wrap h2{font-size:21px!important;font-weight:900!important;line-height:1.35!important;color:#fff}.v192-subtitle{margin-top:6px;font-size:12px;color:#9ba8c1;line-height:1.5}
+.detail-metrics-row{gap:10px!important;margin-top:17px!important}.metric-box{padding:15px 9px!important;border-radius:18px!important;background:linear-gradient(145deg,#111a31,#0b1428)!important;border:1px solid rgba(126,103,238,.18)!important;box-shadow:none!important}.metric-icon{font-size:22px!important}.metric-val{font-size:18px!important;font-weight:900!important}.metric-lbl{font-size:8px!important;letter-spacing:.05em;text-transform:uppercase}
+.v192-unlock-card{margin-top:18px;padding:18px;border-radius:22px;background:radial-gradient(100% 140% at 0% 0%,rgba(112,61,245,.32),transparent 52%),linear-gradient(135deg,#17163b,#25154b 60%,#3e1453);border:1px solid rgba(168,91,255,.46);box-shadow:0 15px 36px rgba(83,42,165,.18)}
+.v192-unlock-head{display:flex;gap:12px;align-items:center}.v192-unlock-icon{width:54px;height:54px;flex:0 0 54px;border-radius:18px;display:grid;place-items:center;font-size:28px;background:rgba(155,77,255,.18);border:1px solid rgba(177,98,255,.25)}.v192-unlock-copy{min-width:0}.v192-unlock-title{font-size:17px;font-weight:900;color:#fff}.v192-unlock-sub{margin-top:4px;font-size:11px;color:#b9b8ce;line-height:1.45}
+.v192-provider-stack{margin-top:13px;display:grid;gap:9px}.v192-provider{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;border-radius:16px;background:rgba(8,14,29,.56);border:1px solid rgba(255,255,255,.07)}.v192-provider-name{font-size:11px;font-weight:800;color:#fff}.v192-provider-progress{margin-top:3px;font-size:9px;color:#8f9bb2}.v192-provider .btn{width:auto;min-width:138px;margin:0;padding:10px 12px;border-radius:13px;font-size:10px;font-weight:800}
+.v192-main-action{width:100%;margin-top:13px;padding:13px 15px;border:0;border-radius:15px;background:linear-gradient(90deg,#6945ff,#bc26ea);color:#fff;font-weight:900;font-size:13px;box-shadow:0 10px 26px rgba(131,57,246,.22)}
+.v192-secure{display:flex;justify-content:center;gap:6px;align-items:center;margin-top:10px;color:#9aa6bd;font-size:9px}
+.v192-loading,.v192-error{margin-top:18px;padding:18px;border-radius:20px;text-align:center;background:linear-gradient(145deg,#11192c,#0b1426);border:1px solid rgba(125,104,235,.18);color:#9ba7bd}.v192-error b{display:block;color:#fff;font-size:13px;margin-bottom:6px}
+.detail-actions-row{gap:10px!important;margin-top:18px!important}.detail-actions-row .btn{border-radius:15px!important;padding:12px 8px!important;font-size:11px!important}.detail-actions-row .btn-p{background:linear-gradient(90deg,#6b43ff,#b325e5)!important}
+#comments-section-anchor{margin-top:24px!important;padding-top:20px!important}#md-comment-input{background:#0d172b!important;border-color:rgba(128,108,226,.2)!important;border-radius:15px!important;padding:13px 14px!important}
+@media(max-width:380px){.v192-provider{grid-template-columns:1fr}.v192-provider .btn{width:100%}.v192-title-wrap h2{font-size:18px!important}}
+
+
+.v20-wallet-card{margin:12px 0;padding:16px;border-radius:20px;background:linear-gradient(145deg,#181d34,#24183d);border:1px solid rgba(160,130,255,.24);box-shadow:var(--shadow-card)}.v20-wallet-balance{font-size:28px;font-weight:800;margin:4px 0}.v20-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-mini{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px}.v20-mini b{display:block;font-size:16px}.v20-admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-admin-grid .full{grid-column:1/-1}.v20-list{display:grid;gap:8px;margin-top:10px}.v20-list-item{padding:11px;border-radius:13px;background:var(--surface-2);border:1px solid rgba(255,255,255,.06)}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="app-loader">
+  <div class="spinner"></div>
+  <p style="font-size:12px; color:var(--muted)">VidUnlock Loading...</p>
+</div>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="row">
+    <div class="brand">
+      <div class="brand-logo" id="brand-logo">▶</div>
+      <div>
+        <div class="brand-title" id="brand-title">Viral Video</div>
+        <div class="brand-sub" id="brand-subtitle">PREMIUM VIDEO HUB</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="online-pill" id="online-pill"><span class="online-dot"></span><span id="online-count">1</span> <span id="online-label">Online</span></div>
+      <button class="lang-btn" onclick="toggleLanguage()" id="lang-toggle-btn">🌐 EN</button>
+      <div class="user-chip">
+        <div class="user-avatar" id="u-avatar">U</div>
+        <div style="font-size:11px;max-width:70px;overflow:hidden;text-overflow:ellipsis" id="u-name">Guest</div>
+        <span class="admin-badge" id="u-badge" style="display:none">ADMIN</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- SEARCH & CATEGORY -->
+<div id="sticky-utils">
+  <div class="search-container">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" id="main-search" data-i18n-ph="searchPlaceholder" placeholder="ভিডিও বা ক্যাটাগরি খুঁজুন..." oninput="handleSearch()">
+    </div>
+  </div>
+  <div class="cat-tabs" id="category-tabs"></div>
+</div>
+
+<!-- HOME VIEW -->
+<section class="view active" id="view-home">
+  <div class="hero-card" id="hero-banner">
+    <div class="hero-topline"><span class="hero-badge" id="hero-badge">🔥 TRENDING NOW</span><span class="hero-badge"><span class="online-dot" style="display:inline-block;margin-right:6px"></span><span id="hero-online-count">1</span> LIVE</span></div>
+    <h2 id="hero-welcome">আপনার Premium Video Gallery 🎬</h2>
+    <p id="hero-subtitle">ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।</p>
+    <div class="hero-stats">
+      <div class="stat-pill"><b id="stat-total-v">0</b><span data-i18n="totalVideo">ভিডিও</span></div>
+      <div class="stat-pill"><b id="stat-unlocked-v">0</b><span data-i18n="unlockedVideo">আনলক</span></div>
+      <div class="stat-pill"><b id="stat-fav-v">0</b><span data-i18n="favVideo">পছন্দ</span></div>
+    </div>
+  </div>
+
+  <div class="v20-wallet-card" style="margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div><div style="font-size:10px;color:var(--muted)">💎 Premium Balance</div><div class="v20-wallet-balance" id="home-v20-balance">৳0.00</div></div>
+      <button class="btn btn-g" style="width:auto;padding:9px 12px" onclick="showView('profile')">👤 My Profile</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span id="home-v20-user">@user</span><span><b id="home-v20-watch">0</b> watched</span></div>
+  </div>
+  <div id="home-content">
+    <div class="section-head"><h3 id="grid-title">🔥 Trending Links</h3><span id="video-count-label">Latest videos</span></div>
+    <div class="grid gallery-grid" id="main-grid"></div>
+  </div>
+</section>
+
+<!-- FAVORITES VIEW -->
+<section class="view" id="view-fav">
+  <h3 class="page-title" data-i18n="myFavs">❤️ আপনার পছন্দ</h3>
+  <div class="grid" id="fav-grid"></div>
+</section>
+
+<!-- UNLOCKED VIEW -->
+<section class="view" id="view-unlock">
+  <h3 class="page-title" data-i18n="unlockedVids">🔓 আনলক করা</h3>
+  <div class="grid" id="unlock-grid"></div>
+</section>
+
+<!-- VIRAL LINKS VIEW -->
+<section class="view" id="view-viral">
+  <h3 class="page-title" data-i18n="viralLinks">🔥 ভাইরাল লিংক</h3>
+  <div id="viral-links-list"></div>
+</section>
+
+<!-- PROFILE VIEW (UPDATED WHITE THEME & PREMIUM UI) -->
+<section class="view" id="view-profile">
+  <div class="profile-container">
+    <div class="profile-hero-card">
+      <div class="profile-avatar-wrapper">
+        <div class="profile-avatar-inner" id="prof-avatar-box">
+          <span id="prof-default-letter">U</span>
+        </div>
+      </div>
+      <h2 class="profile-name" id="prof-name">Guest</h2>
+      <div class="profile-username" id="prof-username">@username</div>
+      <div class="profile-id-pill">
+        <span>🆔</span> <span id="prof-id">ID: 000000</span>
+      </div>
+    </div>
+
+    <div class="v8-profile-stats">
+      <div><b id="prof-opened">0</b><span>ভিডিও ওপেন</span></div>
+      <div><b id="prof-unlocked">0</b><span>আনলক</span></div>
+      <div><b id="prof-favorites">0</b><span>পছন্দ</span></div>
+      <div><b id="prof-reactions">0</b><span>রিয়েকশন</span></div>
+      <div><b id="prof-comments">0</b><span>কমেন্ট</span></div>
+      <div><b id="prof-ad-tasks">0</b><span>Ad Complete</span></div>
+      <div><b id="prof-unique">0</b><span>ইউনিক ভিডিও</span></div>
+    </div>
+    <div style="text-align:center;font-size:10px;color:var(--muted);margin:-4px 0 8px">Join Date: <span id="prof-join-date">—</span></div>
+    <div class="v20-wallet-card">
+      <div style="font-size:11px;color:var(--muted)">💰 Premium Balance</div>
+      <div class="v20-wallet-balance" id="v20-balance">৳0.00</div>
+      <div class="v20-grid">
+        <div class="v20-mini"><b id="v20-watched">0</b><span>Total Video Watched</span></div>
+        <div class="v20-mini"><b id="v20-unlocks">0</b><span>Total Video Unlock</span></div>
+        <div class="v20-mini"><b id="v20-earned">৳0.00</b><span>Total Earn</span></div>
+        <div class="v20-mini"><b id="v20-withdrawn">৳0.00</b><span>Total Withdraw</span></div>
+      </div>
+      <div class="setting-grid" style="margin-top:12px">
+        <div class="form-group"><label>Withdraw Amount</label><input id="v20-wd-amount" type="number" min="0" step="0.01"></div>
+        <div class="form-group"><label>Payment Method</label><select id="v20-wd-method"><option>bKash</option><option>Nagad</option></select></div>
+        <div class="form-group full"><label>Number</label><input id="v20-wd-number" placeholder="01XXXXXXXXX"></div>
+      </div>
+      <button class="btn btn-p" onclick="submitV20Withdraw()">Submit Withdraw Request</button>
+      <div id="v20-withdraw-history" class="v20-list"></div>
+    </div>
+    <div class="admin-card" style="margin-top:12px"><h4>🎯 Available Tasks</h4><div id="v20-user-tasks" class="v20-list"></div></div>
+    <div class="profile-menu-card">
+      <button class="profile-menu-item" onclick="showView('fav')"><div class="profile-menu-left"><div class="profile-menu-icon">❤️</div><span>আমার পছন্দ</span></div><div class="profile-menu-arrow">›</div></button>
+      <button class="profile-menu-item" onclick="showView('unlock')"><div class="profile-menu-left"><div class="profile-menu-icon">🔓</div><span>আমার আনলক ভিডিও</span></div><div class="profile-menu-arrow">›</div></button>
+    </div>
+    <div class="v8-recent-wrap"><h4>🕘 সাম্প্রতিক আনলক</h4><div id="prof-recent" class="v8-recent-list"></div></div>
+  </div>
+</section>
+
+<!-- ADMIN VIEW -->
+<section class="view" id="view-admin">
+  <h3 class="page-title" data-i18n="adminPanel">🛠 অ্যাডমিন প্যানেল</h3>
+  <div class="cat-tabs" style="padding:0;margin-bottom:15px">
+    <button class="tab active" onclick="switchAdminSubView('dash', this)" data-i18n="dashboard">📊 Analytics</button>
+    <button class="tab" onclick="switchAdminSubView('bots', this)">🤖 Bot Settings</button>
+    <button class="tab" onclick="switchAdminSubView('vids', this)" data-i18n="manageVideos">📦 Package Settings</button>
+    <button class="tab" onclick="switchAdminSubView('cats', this)" data-i18n="manageCats">ক্যাটাগরি ম্যানেজ</button>
+    <button class="tab" onclick="switchAdminSubView('viral', this)" data-i18n="manageViral">ভাইরাল লিংক</button>
+    <button class="tab" onclick="switchAdminSubView('broadcast', this)">📢 Broadcast</button>
+    <button class="tab" onclick="switchAdminSubView('users', this)">👥 Users</button>
+    <button class="tab" id="admin-admins-tab" onclick="switchAdminSubView('admins', this)">👑 Admin Permission</button>
+    <button class="tab" onclick="switchAdminSubView('joinleave', this)">👋 Join/Leave</button>
+    <button class="tab" onclick="switchAdminSubView('v20video', this)">🎬 Video Settings</button>
+    <button class="tab" id="v20-tutorial-tab" onclick="switchAdminSubView('v20tutorial', this)">🎓 Tutorial Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20ads', this)">📢 Ads Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20wallet', this)">💰 Wallet Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20tasks', this)">🎯 Task Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20notify', this)">🔔 Notification Settings</button>
+    <button class="tab" onclick="switchAdminSubView('v20withdraw', this)">💸 Withdraw Requests</button>
+    <button class="tab" onclick="switchAdminSubView('settings', this)" data-i18n="settings">সেটিংস</button>
+  </div>
+  
+  <div id="admin-dash" class="admin-subview">
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="dashboard-stat"><div class="label">🎬 মোট ভিডিও</div><div class="value" id="ad-stat-v">0</div></div>
+      <div class="dashboard-stat"><div class="label">🟢 এখন Online</div><div class="value" id="ad-stat-online">0</div></div>
+      <div class="dashboard-stat"><div class="label">👥 মোট Bot User</div><div class="value" id="ad-stat-u">0</div></div>
+      <div class="dashboard-stat"><div class="label">⚡ Today Active</div><div class="value" id="ad-stat-today">0</div></div>
+      <div class="dashboard-stat"><div class="label">📁 ক্যাটাগরি</div><div class="value" id="ad-stat-c">0</div></div>
+      <div class="dashboard-stat"><div class="label">📨 Video Request</div><div class="value" id="ad-stat-av">0</div></div>
+      <div class="dashboard-stat"><div class="label">🔓 Video Unlocks</div><div class="value" id="ad-stat-unlocks">0</div><div class="label" style="margin-top:4px">Today: <span id="ad-stat-unlocks-today">0</span></div></div>
+      <div class="dashboard-stat"><div class="label">📺 Ads Watched</div><div class="value" id="ad-stat-ads">0</div><div class="label" style="margin-top:4px">Today: <span id="ad-stat-ads-today">0</span></div></div>
+      <div class="dashboard-stat"><div class="label">❤️ মোট Reaction</div><div class="value" id="ad-stat-reactions">0</div></div>
+      <div class="dashboard-stat"><div class="label">💬 মোট Comment</div><div class="value" id="ad-stat-comments">0</div></div>
+    </div>
+  </div>
+
+
+  <div id="admin-bots" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>🤖 Three-Bot Central Control</h4>
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin:7px 0 13px">Mini Bot শুধু Mini App + Admin Control Center। Notification Bot package/broadcast/join-leave চালাবে। Video Bot protected video delivery করবে। সব control এই Mini App থেকেই হবে।</p>
+      <div id="bot-role-list" class="bot-role-grid"><div class="empty-state" style="padding:18px">Status load হচ্ছে...</div></div>
+      <button class="btn btn-g" style="margin-top:10px" onclick="loadBotControl()">🔄 Status Refresh</button>
+    </div>
+    <div class="admin-card">
+      <h4>🧪 Bot Test</h4>
+      <p style="font-size:10px;color:var(--muted);margin:7px 0 10px">Test চাপলে নির্বাচিত Bot আপনার Telegram inbox-এ একটি test message পাঠাবে।</p>
+      <div class="setting-grid">
+        <button class="btn btn-g" onclick="testBotRole('mini')">📱 Mini Bot Test</button>
+        <button class="btn btn-g" onclick="testBotRole('notification')">📢 Notification Test</button>
+        <button class="btn btn-g full" onclick="testBotRole('video')">🎥 Video Bot Test</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-vids" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>➕ নতুন ভিডিও পোস্ট তৈরি করুন</h4>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0 14px">প্রথমে Private Storage Channel-এ ভিডিও আপলোড করুন। Bot Admin inbox-এ <b>?start=video_xxx</b> Original Video Link দেবে। সেই Original Link short করুন। এখানে Title + Thumbnail + Video Code + Short Link দিয়ে Package Publish করলে আলাদা <b>?startapp=v...</b> Share Link অটোমেটিক তৈরি হবে।</div>
+      <div class="admin-card" style="margin:10px 0 14px;background:rgba(124,77,255,.06)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h4>🖼️ Auto Thumbnail Draft</h4><button class="btn btn-g" style="width:auto;padding:7px 10px" onclick="loadAutoDrafts()">🔄 Refresh</button></div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:6px">Storage Channel-এ Full Video + caption দিলেই Telegram video preview frame থেকে অটো 16:9 thumbnail draft হবে। Caption-এর লেখা premium colored overlay হবে। Manual thumbnail শুধু চাইলে replace করার জন্য।</div>
+        <div id="auto-draft-list" style="margin-top:8px"><div class="empty-state" style="padding:18px 8px">Draft load করতে Refresh চাপুন</div></div>
+      </div>
+      <div class="form-group"><label>শিরোনাম</label><input type="text" id="av-title"></div>
+      <div class="form-group"><label>ক্যাটাগরি</label><select id="av-cat"></select></div>
+      <div class="form-group"><label>Video Code (যেমন: video_145)</label><input type="text" id="av-video-code" placeholder="video_145"></div>
+      <div class="form-group"><label>Original Bot Deep Link</label><input type="text" id="av-deep-link" placeholder="https://t.me/Bangladesh_vairal_videobot?start=video_145"></div>
+      <div class="form-group"><label>Short Link (শুধু ‘ভিডিও দেখুন’ বাটনে থাকবে)</label><input type="text" id="av-short-link" placeholder="https://terabooxshort.com/..."></div>
+      <div class="form-group"><label>Delivery Mode</label><select id="av-delivery-mode"><option value="video_bot">🤖 Video Bot — Ad শেষে সরাসরি ভিডিও</option><option value="short_link">🔗 Short Link — পুরোনো flow</option></select></div>
+      <div class="form-group full"><label>Thumbnail-এর উপরের লেখা</label><input type="text" id="av-thumb-text" maxlength="180" placeholder="Channel caption থেকে অটো আসবে — চাইলে edit করুন" oninput="updateThumbTextPreview()"><small style="opacity:.7">এই লেখা thumbnail-এর নিচের অংশে premium colored overlay হিসেবে দেখা যাবে। খালি রাখলে overlay থাকবে না।</small></div>
+      <div class="form-group">
+        <label>থাম্বনেইল — Auto 16:9 + Optional Manual Replace</label>
+        <input type="file" accept="image/*" onchange="previewFile(this, 'av-thumb-prev')">
+        <div class="thumb-prev" id="av-thumb-prev"><span>Preview</span></div>
+      </div>
+      <div class="setting-grid" style="margin-bottom:12px">
+        <div class="form-group"><label>Required Ads</label><input type="number" id="av-required-ads" min="0" max="10" value="1"></div>
+        <div class="form-group"><label><input type="checkbox" id="av-broadcast" checked> Broadcast</label></div>
+        <div class="form-group"><label><input type="checkbox" id="av-featured"> Featured</label></div>
+        <div class="form-group"><label><input type="checkbox" id="av-trending" checked> Trending</label></div>
+        <div class="form-group"><label><input type="checkbox" id="av-published" checked> Published</label></div>
+      </div>
+      <div class="form-group"><label>Generated Package Share Link</label><div style="display:flex;gap:7px"><input type="text" id="av-generated-share" readonly placeholder="Publish করলে ?startapp=v... link এখানে আসবে"><button class="btn btn-g" type="button" style="width:auto;padding:0 12px" onclick="fallbackCopyShareLink(document.getElementById('av-generated-share').value)">Copy</button></div></div>
+      <button class="btn btn-p" onclick="saveVideo()" id="upload-btn">ভিডিও Package Publish করুন</button><button class="btn btn-g hidden" onclick="cancelVideoEdit()" id="cancel-edit-btn" style="margin-top:8px">Edit বাতিল</button>
+    </div>
+
+    <h4 style="margin:15px 0 10px">সকল ভিডিও তালিকা ও ডিলিট</h4>
+    <div id="admin-vid-list"></div>
+  </div>
+
+  <div id="admin-cats" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>➕ নতুন ক্যাটাগরি</h4>
+      <div class="form-group"><label>নাম</label><input type="text" id="ac-name"></div>
+      <div class="form-group"><label>ইমোজি/আইকন</label><input type="text" id="ac-icon" placeholder="🔥"></div>
+      <button class="btn btn-p" onclick="saveCategory()">সেভ ক্যাটাগরি</button>
+    </div>
+
+    <h4 style="margin:15px 0 10px">সকল ক্যাটাগরি তালিকা ও ডিলিট</h4>
+    <div id="admin-cat-list"></div>
+  </div>
+
+  <div id="admin-viral" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4 data-i18n="addViralLink">➕ নতুন ভাইরাল লিংক যোগ করুন</h4>
+      <div class="form-group"><label data-i18n="linkTitle">লিংকের শিরোনাম</label><input type="text" id="avl-title" placeholder="যেমন: নতুন ভাইরাল ভিডিও লিংক"></div>
+      <div class="form-group"><label data-i18n="linkUrl">ইউআরএল (URL)</label><input type="text" id="avl-url" placeholder="https://t.me/example"></div>
+      <button class="btn btn-p" onclick="saveViralLink()" data-i18n="saveLink">সেভ ভাইরাল লিংক</button>
+    </div>
+
+    <h4 style="margin:15px 0 10px" data-i18n="allViralLinks">সকল ভাইরাল লিংক তালিকা</h4>
+    <div id="admin-viral-list"></div>
+  </div>
+
+  <div id="admin-broadcast" class="admin-subview hidden">
+    <div class="admin-card"><h4>📢 Direct Broadcast Center</h4>
+      <div class="form-group"><label>Message Type</label><select id="bc-type"><option value="text">Text</option><option value="photo">Photo URL</option><option value="video">Video URL</option></select></div>
+      <div class="form-group full"><label>Message / Caption</label><textarea id="bc-text" rows="5" placeholder="সব ইউজারের ইনবক্সে যে মেসেজ যাবে"></textarea></div>
+      <div class="form-group full"><label>Media URL (Photo/Video হলে)</label><input id="bc-media" placeholder="https://..."></div>
+      <div class="form-group"><label>Button Text (optional)</label><input id="bc-button-text" placeholder="🎬 ওপেন করুন"></div>
+      <div class="form-group"><label>Button URL (optional)</label><input id="bc-button-url" placeholder="https://..."></div>
+      <button class="btn btn-p" onclick="sendDirectBroadcast()">📤 এখনই Broadcast পাঠান</button>
+      <div id="bc-result" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <div id="admin-users" class="admin-subview hidden">
+    <div class="admin-card"><h4>👥 Bot Users Control</h4><p style="font-size:11px;color:var(--muted)">User ID, username, active status এবং last seen দেখুন। প্রয়োজন হলে user inactive/active করতে পারবেন।</p>
+      <button class="btn btn-g" onclick="loadAdminUsers()">🔄 Users Refresh</button></div>
+    <div id="admin-user-list"></div>
+  </div>
+
+  <div id="admin-admins" class="admin-subview hidden">
+    <div class="admin-card"><h4>👑 Admin Management</h4>
+      <div class="form-group"><label>Telegram User ID</label><input id="new-admin-id" inputmode="numeric" placeholder="6994836801"></div>
+      <div class="form-group"><label>Admin Name</label><input id="new-admin-name" placeholder="Manager"></div>
+      <div class="setting-grid">
+        <label><input type="checkbox" id="perm-content" checked> Content</label>
+        <label><input type="checkbox" id="perm-settings" checked> Settings</label>
+        <label><input type="checkbox" id="perm-broadcast" checked> Broadcast</label>
+        <label><input type="checkbox" id="perm-users" checked> Users</label>
+        <label><input type="checkbox" id="perm-admins"> Manage Admins</label>
+        <label><input type="checkbox" id="perm-packages" checked> Package Control</label>
+        <label><input type="checkbox" id="perm-withdraw"> Withdraw Control</label>
+        <label><input type="checkbox" id="perm-support"> User Support</label>
+        <label><input type="checkbox" id="perm-tasks"> Task Control</label>
+        <label><input type="checkbox" id="perm-notify"> Notification Control</label>
+        <label><input type="checkbox" id="perm-analytics" checked> Analytics</label>
+      </div>
+      <button class="btn btn-p" onclick="saveAdminUser()">➕ Admin যোগ/আপডেট করুন</button>
+    </div>
+    <div id="admin-admin-list"></div>
+  </div>
+
+  <div id="admin-joinleave" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>👋 Join / Leave Welcome Manager</h4>
+      <p style="font-size:11px;color:var(--muted);line-height:1.6;margin:8px 0 14px">Bot-কে Group/Channel-এর Admin করলে chat অটো detect হবে। Join Request এলে user_chat_id দিয়ে inbox welcome পাঠানোর চেষ্টা হবে; normal Join/Leave-এ user আগে Bot start করে থাকলে inbox message যাবে।</p>
+      <div class="setting-grid">
+        <div class="form-group full"><label>Chat ID</label><input id="jl-chat-id" inputmode="numeric" placeholder="-1001234567890"></div>
+        <div class="form-group"><label>Chat Name</label><input id="jl-chat-title" placeholder="My Group / Channel"></div>
+        <div class="form-group"><label>Type</label><select id="jl-chat-type"><option value="group">Group</option><option value="supergroup">Supergroup</option><option value="channel">Channel</option></select></div>
+        <div class="form-group full"><label>Join / Invite URL</label><input id="jl-join-url" placeholder="https://t.me/+xxxx অথবা https://t.me/username"></div>
+      </div>
+      <div class="setting-grid" style="margin:10px 0 14px">
+        <label><input type="checkbox" id="jl-enabled" checked> Enabled</label>
+        <label><input type="checkbox" id="jl-join-request" checked> Join Request Welcome</label>
+        <label><input type="checkbox" id="jl-direct-join" checked> Direct Join Welcome</label>
+        <label><input type="checkbox" id="jl-leave" checked> Leave Inbox</label>
+        <label><input type="checkbox" id="jl-auto-approve"> Auto Approve Join Request</label>
+      </div>
+      <button class="btn btn-p" onclick="saveManagedChat()">💾 Chat Save / Update</button>
+      <button class="btn btn-g" style="margin-top:8px" onclick="clearManagedChatForm()">➕ New Chat</button>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <div class="dashboard-stat"><div class="label">👋 Join Events</div><div class="value" id="jl-stat-joins">0</div></div>
+      <div class="dashboard-stat"><div class="label">👋 Inbox Sent</div><div class="value" id="jl-stat-sent">0</div></div>
+      <div class="dashboard-stat"><div class="label">🚪 Leave Events</div><div class="value" id="jl-stat-leaves">0</div></div>
+      <div class="dashboard-stat"><div class="label">📊 Total Events</div><div class="value" id="jl-stat-total">0</div></div>
+    </div>
+    <div class="admin-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h4>📚 Managed Chats</h4><button class="btn btn-g" style="width:auto;padding:8px 12px" onclick="loadManagedChats()">🔄 Refresh</button></div></div>
+    <div id="managed-chat-list"></div>
+  </div>
+
+  <div id="admin-v20video" class="admin-subview hidden"><div class="admin-card"><h4>🎬 Video Bot Advanced Message</h4><div class="setting-grid"><div class="form-group full"><label>Custom Message</label><textarea id="v20-vmsg" rows="4"></textarea></div><div class="form-group"><label>Button 1 Name</label><input id="v20-b1n"></div><div class="form-group"><label>Button 1 URL</label><input id="v20-b1u"></div><label><input type="checkbox" id="v20-b1e"> Button 1 ON</label><div></div><div class="form-group"><label>Button 2 Name</label><input id="v20-b2n"></div><div class="form-group"><label>Button 2 URL</label><input id="v20-b2u"></div><label><input type="checkbox" id="v20-b2e"> Button 2 ON</label><div></div><div class="form-group full"><label>Deleted Video Message</label><textarea id="v20-dmsg" rows="4"></textarea></div><div class="form-group"><label>Deleted Button 1 Name</label><input id="v20-db1n"></div><div class="form-group"><label>Deleted Button 1 URL</label><input id="v20-db1u"></div><label><input type="checkbox" id="v20-db1e"> Deleted Button 1 ON</label><div></div><div class="form-group"><label>Deleted Button 2 Name</label><input id="v20-db2n"></div><div class="form-group"><label>Deleted Button 2 URL</label><input id="v20-db2u"></div><label><input type="checkbox" id="v20-db2e"> Deleted Button 2 ON</label></div><button class="btn btn-p" onclick="saveV20Buttons()">Save Video Settings</button></div><div class="admin-card"><h4>🎁 Video Access Text Control</h4><p style="font-size:11px;color:var(--muted);margin:6px 0 12px">সব লেখা এখান থেকে edit করা যাবে। <b>{completed}</b>, <b>{remaining}</b>, <b>{required}</b> placeholder ব্যবহার করা যাবে।</p><div class="form-group"><label>Access Title</label><input id="v20-txt-access-title"></div><div class="form-group"><label>Instruction</label><textarea id="v20-txt-access-instruction" rows="2"></textarea></div><div class="form-group"><label>Ad Seen Text</label><input id="v20-txt-seen"></div><div class="form-group"><label>Remaining Ad Text</label><input id="v20-txt-remaining"></div><div class="form-group"><label>Ad Button Text</label><input id="v20-txt-ad-button"></div><div class="form-group"><label>All Ads Complete Text</label><textarea id="v20-txt-done" rows="2"></textarea></div><div class="form-group"><label>Watch Video Button Text</label><input id="v20-txt-watch"></div><div class="form-group"><label>Secure/Footer Text</label><input id="v20-txt-secure"></div><button class="btn btn-p" onclick="saveV20Texts()">Save Access Texts</button></div></div>
+  <div id="admin-v20tutorial" class="admin-subview hidden"><div class="admin-card"><h4>🎓 Owner Tutorial Settings</h4><p style="font-size:10px;color:var(--muted)">Owner only. Tutorial first /start-এ একবার দেখানো হবে।</p><div class="setting-grid"><label><input type="checkbox" id="v20-t-enabled"> Enable Tutorial</label><div></div><div class="form-group full"><label>Tutorial Video Code</label><input id="v20-t-code" placeholder="video_145"></div><div class="form-group full"><label>Title</label><input id="v20-t-title"></div><div class="form-group full"><label>Description</label><textarea id="v20-t-desc" rows="4"></textarea></div><div class="form-group full"><label>Home Button Text</label><input id="v20-t-btn"></div></div><button class="btn btn-p" onclick="saveV20Tutorial()">Save Tutorial</button><button class="btn btn-d" style="margin-top:8px" onclick="deleteV20Tutorial()">Delete Tutorial Video</button></div></div>
+  <div id="admin-v20ads" class="admin-subview hidden"><div class="admin-card"><h4>📢 AdsGram + Monetag</h4><div class="setting-grid"><div class="form-group full"><label>Ads Mode</label><select id="v20-ad-mode"><option value="adsgram">AdsGram Only</option><option value="monetag">Monetag Only</option><option value="both">Both</option><option value="off">Ads Disable</option></select></div><label><input type="checkbox" id="v20-ag-enabled"> AdsGram ON</label><label><input type="checkbox" id="v20-ag-reward"> Reward Mode</label><div class="form-group"><label>Block ID</label><input id="v20-ag-block"></div><div class="form-group"><label>Required Ads</label><input id="v20-ag-required" type="number"></div><label><input type="checkbox" id="v20-mo-enabled"> Monetag ON</label><div></div><div class="form-group"><label>Zone ID</label><input id="v20-mo-zone"></div><div class="form-group" style="display:none"><label>Wait Time</label><input id="v20-mo-wait" type="number" value="0"></div><div class="form-group full"><label>Smart Link</label><input id="v20-mo-link"></div><div class="form-group full"><label>Script/API</label><textarea id="v20-mo-script" rows="3"></textarea></div></div><button class="btn btn-p" onclick="saveV20Ads()">Save Ads Settings</button></div></div>
+  <div id="admin-v20wallet" class="admin-subview hidden"><div class="admin-card"><h4>💰 Wallet Settings</h4><div class="setting-grid"><div class="form-group"><label>Per Video Reward</label><input id="v20-w-reward" type="number" step="0.01"></div><div class="form-group"><label>Daily Reward Limit</label><input id="v20-w-daily" type="number" step="0.01"></div><div class="form-group"><label>Minimum Withdraw</label><input id="v20-w-min" type="number" step="0.01"></div><div class="form-group"><label>Maximum Withdraw</label><input id="v20-w-max" type="number" step="0.01"></div><label><input type="checkbox" id="v20-w-enabled"> Withdraw ON</label><div class="form-group"><label>Payment Methods</label><input id="v20-w-methods" value="bKash,Nagad"></div></div><button class="btn btn-p" onclick="saveV20WalletSettings()">Save Wallet Settings</button></div></div>
+  <div id="admin-v20tasks" class="admin-subview hidden"><div class="admin-card"><h4>🎯 Task Management</h4><input id="v20-task-id" type="hidden"><div class="setting-grid"><div class="form-group full"><label>Task Title</label><input id="v20-task-title"></div><div class="form-group"><label>Task Type</label><select id="v20-task-type"><option value="ads">Ads Task</option><option value="link">Link Task</option></select></div><div class="form-group"><label>Reward Amount</label><input id="v20-task-reward" type="number" step="0.01"></div><div class="form-group full"><label>Task Link</label><input id="v20-task-link"></div><label><input type="checkbox" id="v20-task-enabled" checked> Status ON</label></div><button class="btn btn-p" onclick="saveV20Task()">Add / Update Task</button><div id="v20-task-list" class="v20-list"></div></div></div>
+  <div id="admin-v20notify" class="admin-subview hidden"><div class="admin-card"><h4>🔔 Notification Channels</h4><div class="setting-grid"><div class="form-group"><label>Channel ID</label><input id="v20-ch-id" placeholder="-100..."></div><div class="form-group"><label>Channel Name</label><input id="v20-ch-title"></div></div><button class="btn btn-p" onclick="saveV20Channel()">Add / Change Channel</button><div id="v20-channel-list" class="v20-list"></div></div><div class="admin-card"><h4>🤖 Package Notification Text</h4><p style="font-size:11px;color:var(--muted);margin:6px 0 12px">৩টি Bot-এর notification আলাদা করে edit করা যাবে। <b>Mini Bot-এ thumbnail যাবে না</b>; Video Bot ও Notification Bot-এ thumbnailসহ notification যাবে। <b>{package_name}</b> ও <b>{total_video}</b> placeholder ব্যবহার করা যাবে।</p><div class="form-group"><label>Mini Bot Message (No Thumbnail)</label><textarea id="v20-txt-mb-msg" rows="6"></textarea></div><div class="form-group"><label>Mini Bot Button Text</label><input id="v20-txt-mb-btn"></div><div class="form-group"><label>Video Bot Message (With Thumbnail)</label><textarea id="v20-txt-vb-msg" rows="6"></textarea></div><div class="form-group"><label>Video Bot Button Text</label><input id="v20-txt-vb-btn"></div><div class="form-group"><label>Notification Bot Message (With Thumbnail)</label><textarea id="v20-txt-nb-msg" rows="6"></textarea></div><div class="form-group"><label>Notification Bot Button Text</label><input id="v20-txt-nb-btn"></div><div class="form-group"><label>Selected Channel Message</label><textarea id="v20-txt-ch-msg" rows="6"></textarea></div><div class="form-group"><label>Selected Channel Button Text</label><input id="v20-txt-ch-btn"></div><button class="btn btn-p" onclick="saveV20Texts()">Save Notification Texts</button></div></div>
+  <div id="admin-v20withdraw" class="admin-subview hidden"><div class="admin-card"><h4>💸 Withdraw Requests</h4><div id="v20-withdraw-list" class="v20-list"></div></div></div>
+  <div id="admin-settings" class="admin-subview hidden">
+    <div class="admin-card">
+      <h4>⚙️ Bot & Mini App Control</h4>
+      <div class="setting-grid">
+      <div class="form-group full"><label>Brand / App Name</label><input id="set-brand" placeholder="Bangladesh Viral Video"></div>
+      <div class="form-group full"><label>Header Subtitle</label><input id="set-brand-subtitle" placeholder="PREMIUM VIDEO HUB"></div>
+      <div class="form-group full"><label>Home Hero Text</label><input id="set-hero-text" placeholder="নতুন ও ট্রেন্ডিং ভিডিও দেখুন"></div>
+      <div class="form-group"><label>Home Menu Name</label><input id="set-nav-home" placeholder="হোম"></div>
+      <div class="form-group"><label>Favorite Menu Name</label><input id="set-nav-fav" placeholder="পছন্দ"></div>
+      <div class="form-group"><label>Unlock Menu Name</label><input id="set-nav-unlock" placeholder="আনলক"></div>
+      <div class="form-group"><label>Viral Menu Name</label><input id="set-nav-viral" placeholder="ভাইরাল লিংক"></div>
+      <div class="form-group"><label>Profile Menu Name</label><input id="set-nav-profile" placeholder="প্রোফাইল"></div>
+      <div class="form-group"><label>Online Label</label><input id="set-online-label" placeholder="Online"></div>
+      </div>
+      <div class="form-group full"><label>Mini App URL (HTTPS)</label><input id="set-webapp-url" placeholder="https://your-domain.com/index.html"></div>
+      <div class="form-group full"><label>Private Storage Channel ID</label><input id="set-storage-channel" placeholder="-1001234567890"><small style="opacity:.7">Channel পরিবর্তনের আগে Bot-কে নতুন channel-এর Admin করুন।</small></div>
+      <div class="form-group full"><label>Join Channel URL (optional)</label><input id="set-join-channel-url" placeholder="https://t.me/yourchannel"></div>
+      <div class="form-group full"><label>Support URL (optional)</label><input id="set-support-url" placeholder="https://t.me/supportusername"></div>
+      <div class="form-group"><label>Telegram Menu Button Name</label><input id="set-menu-button-text" placeholder="🎬 Video open"></div>
+      <div class="form-group full"><label>Bot Welcome Message</label><textarea id="set-welcome-text" rows="3" placeholder="👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।"></textarea></div>
+      <div class="admin-card" style="margin:14px 0;background:rgba(32,216,137,.06);border:1px solid rgba(32,216,137,.20)">
+        <h4 style="margin-bottom:10px">💰 AdsGram + Monetag Monetization</h4>
+        <div class="form-group full"><label>Monetization Mode</label><select id="set-monetization-mode"><option value="both">AdsGram + Monetag</option><option value="adsgram">AdsGram Only</option><option value="monetag">Monetag Only</option><option value="off">সব Ads বন্ধ</option></select></div>
+        <div class="setting-grid">
+          <label><input id="set-adsgram-enabled" type="checkbox" checked> AdsGram ON</label>
+          <label><input id="set-monetag-enabled" type="checkbox" checked> Monetag ON</label>
+        </div>
+        <div class="form-group full"><label>AdsGram Block ID</label><input id="set-adsgram-block-id" value="int-45179" placeholder="int-45179"></div>
+        <div class="form-group"><label>AdsGram Required Ads</label><input id="set-required-ads-default" type="number" min="0" max="10" value="1"></div>
+        <div class="form-group"><label>AdsGram Button Text</label><input id="set-ad-button-text" value="📢 AdsGram Ad দেখুন"></div>
+        <div class="form-group full"><label>Monetag Zone ID</label><input id="set-monetag-zone-id" value="11404425" placeholder="11404425"></div>
+        <div class="form-group"><label>Monetag Required Ads</label><input id="set-monetag-required-default" type="number" min="0" max="10" value="1"></div>
+        <div class="form-group"><label>Monetag Button Text</label><input id="set-monetag-button-text" value="💰 Monetag Ad দেখুন"></div>
+        <div class="form-group" style="display:none"><label>Monetag Wait (seconds)</label><input id="set-monetag-wait-seconds" type="number" value="0"></div>
+        <div class="form-group"><label>Unlock Button Text</label><input id="set-ad-unlock-text" value="🔓 ভিডিও আনলক করুন"></div>
+        <small style="display:block;color:var(--muted);line-height:1.5">Default Monetag SDK: zone 11404425. Zone পরিবর্তন করলে Mini App নতুন SDK loader দিয়ে সেটি ব্যবহার করবে।</small>
+      </div>
+      <div class="admin-card" style="margin:14px 0;background:rgba(73,215,255,.06);border:1px solid rgba(73,215,255,.20)">
+        <h4 style="margin-bottom:10px">👋 Join / Leave Inbox Welcome</h4>
+        <div class="setting-grid">
+          <label><input id="set-welcome-manager-enabled" type="checkbox" checked> Welcome Manager ON</label>
+          <label><input id="set-join-request-welcome-enabled" type="checkbox" checked> Join Request Inbox</label>
+          <label><input id="set-direct-join-welcome-enabled" type="checkbox" checked> Direct Join Inbox</label>
+          <label><input id="set-leave-inbox-enabled" type="checkbox" checked> Leave Inbox</label>
+          <label><input id="set-auto-approve-join-requests" type="checkbox"> Default Auto Approve</label>
+        </div>
+        <div class="form-group full" style="margin-top:10px"><label>Join Welcome Message</label><textarea id="set-join-welcome-text" rows="4" placeholder="👋 স্বাগতম!... "></textarea></div>
+        <div class="form-group full"><label>Leave Inbox Message</label><textarea id="set-leave-inbox-text" rows="4" placeholder="😢 আপনি গ্রুপ থেকে বের হয়েছেন..."></textarea></div>
+        <div class="admin-card" style="margin:12px 0 0;background:rgba(7,12,24,.48);border:1px solid rgba(73,215,255,.14)">
+          <h4 style="margin-bottom:10px">🔘 Welcome Button URL Control</h4>
+          <div class="setting-grid">
+            <div class="form-group"><label>Video Open Button Text</label><input id="set-welcome-video-button-text" placeholder="🎬 ভিডিও ওপেন করুন"></div>
+            <div class="form-group"><label><input id="set-welcome-video-button-enabled" type="checkbox" checked> Video Button ON</label></div>
+            <div class="form-group full"><label>Video Open Button URL</label><input id="set-welcome-video-button-url" placeholder="https://t.me/YourMiniBot?start=welcome"><small style="opacity:.7">খালি রাখলে Mini Bot-এর default welcome link ব্যবহার হবে।</small></div>
+
+            <div class="form-group"><label>Start Bot Button Text</label><input id="set-welcome-start-button-text" placeholder="🚀 Start Bot"></div>
+            <div class="form-group"><label><input id="set-welcome-start-button-enabled" type="checkbox" checked> Start Button ON</label></div>
+            <div class="form-group full"><label>Start Bot Button URL</label><input id="set-welcome-start-button-url" placeholder="https://t.me/YourBot?start=welcome"><small style="opacity:.7">যে Bot/Deep Link খুলতে চান সেটি দিন।</small></div>
+
+            <div class="form-group"><label>Rejoin Button Text</label><input id="set-welcome-rejoin-button-text" placeholder="🔄 আবার Join করুন"></div>
+            <div class="form-group"><label><input id="set-welcome-rejoin-button-enabled" type="checkbox" checked> Rejoin Button ON</label></div>
+            <div class="form-group full"><label>Rejoin Button URL (optional global)</label><input id="set-welcome-rejoin-button-url" placeholder="https://t.me/+xxxx অথবা https://t.me/channel"><small style="opacity:.7">খালি রাখলে Join/Leave → Managed Chat-এর Join / Invite URL ব্যবহার হবে।</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="admin-card" id="legacy-tutorial-card" style="margin:14px 0;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.22)">
+        <h4 style="margin-bottom:10px">🎓 New User Tutorial</h4>
+        <div class="form-group"><label><input id="set-tutorial-enabled" type="checkbox" checked> /start করলে Tutorial Video পাঠান</label></div>
+        <div class="form-group full"><label>Tutorial Video Code</label><input id="set-tutorial-code" placeholder="video_145"><small style="opacity:.7">সবচেয়ে সহজ: Storage Channel-এ tutorial video upload করুন → Owner inbox-এর “Tutorial Video হিসেবে সেট করুন” বাটন চাপুন।</small></div>
+        <div class="form-group full"><label>Tutorial Caption</label><textarea id="set-tutorial-caption" rows="4" placeholder="ভিডিও দেখে নিয়ম বুঝে নিন..."></textarea></div>
+        <div class="form-group"><label>Tutorial Button Text</label><input id="set-tutorial-button" placeholder="🎬 ভিডিও দেখতে শুরু করুন"></div>
+      </div>
+      <div class="form-group"><label>Watch Button Text</label><input id="set-watch-text" placeholder="Watch Video"></div>
+      <div class="form-group"><label>Broadcast Button Text</label><input id="set-broadcast-text" placeholder="▶ ভিডিও ওপেন করুন"></div>
+      <div class="form-group"><label>Video Auto Delete (minutes)</label><input id="set-delete-min" type="number" min="1" value="20"></div>
+      <div class="form-group"><label><input id="set-protect" type="checkbox" checked> Protected Content (Forward/Save restriction)</label></div>
+      <div class="form-group"><label><input id="set-maintenance" type="checkbox"> Maintenance Mode</label></div>
+      <div class="form-group full"><label>Maintenance Message</label><textarea id="set-maintenance-message" rows="2" placeholder="⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে..."></textarea></div>
+      <div class="form-group"><label><input id="set-show-online" type="checkbox" checked> Show Live Online Counter</label></div>
+      <div class="form-group"><label><input id="set-comments-enabled" type="checkbox" checked> Comments চালু</label></div>
+      <div class="form-group"><label><input id="set-reactions-enabled" type="checkbox" checked> Reactions চালু</label></div>
+      <div class="form-group"><label><input id="set-favorites-enabled" type="checkbox" checked> Favorites চালু</label></div>
+      <div class="form-group"><label><input id="set-profile-stats-enabled" type="checkbox" checked> Profile Stats চালু</label></div>
+      <button class="btn btn-p" id="settings-save-btn" onclick="saveAdminSettings()">সেটিংস সেভ করুন</button>
+    </div>
+    <div class="admin-card">
+      <h4>Data Management</h4>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <button class="btn btn-g" onclick="exportData()">📥 Export Backup (JSON)</button>
+        <label class="btn btn-g">📤 Import Backup<input type="file" style="display:none" accept=".json" onchange="importData(this)"></label>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DETAIL MODAL -->
+<div class="modal" id="modal-detail">
+  <div class="modal-sheet">
+    <div class="sheet-header">
+      <button onclick="closeModal('modal-detail')" style="background:none;border:none;font-size:22px;color:#fff;cursor:pointer">✕</button>
+      <div id="md-header-title" style="font-weight:700">Video Details</div>
+      <div style="display:flex;gap:15px;align-items:center;">
+        <button id="md-react-btn" style="background:none;border:none;font-size:20px;cursor:pointer;" onclick="toggleReaction()">❤️ <span id="md-react-count">0</span></button>
+        <button id="md-fav-btn" style="background:none;border:none;font-size:22px;cursor:pointer;">🤍</button>
+      </div>
+    </div>
+    <div class="sheet-content">
+      <div id="md-media-container" style="width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#000;box-shadow:var(--shadow-card)"></div>
+      
+      <div class="v192-title-wrap">
+        <h2 id="md-title"></h2>
+        <div id="md-subtitle" class="v192-subtitle">সাবস্ক্রাইবারদের জন্য স্পেশাল ভিডিও 🤗</div>
+      </div>
+
+      <div class="detail-metrics-row">
+        <div class="metric-box">
+          <div class="metric-icon">👁️</div>
+          <div class="metric-val" id="md-metric-views">0</div>
+          <div class="metric-lbl">Total Views</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-icon">🔓</div>
+          <div class="metric-val" id="md-metric-prog">0/1</div>
+          <div class="metric-lbl">Access</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-icon">📁</div>
+          <div class="metric-val" id="md-metric-cat" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Category</div>
+          <div class="metric-lbl">Category</div>
+        </div>
+      </div>
+
+      <div id="md-action-area"></div>
+
+      <div class="detail-actions-row">
+        <button class="btn btn-g" onclick="closeModal('modal-detail');showView('home')"><i>🏠</i> হোম</button>
+        <button class="btn btn-g" onclick="scrollToComments()"><i>💬</i> কমেন্টস</button>
+        <button class="btn btn-p" onclick="shareVideo(currentActiveVid.id)" style="font-size:12px;padding:10px 8px;border-radius:12px"><i>🔗</i> শেয়ার</button>
+      </div>
+
+      <div id="comments-section-anchor" style="margin-top:25px;border-top:1px solid var(--border);padding-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h4 style="font-size:15px">💬 কমেন্টস (<span id="md-comment-count">0</span>)</h4>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="md-comment-input" placeholder="আপনার মন্তব্য লিখুন..." style="flex:1;background:var(--surface);border:1px solid var(--border);padding:10px 14px;border-radius:12px;color:#fff;outline:none">
+          <button class="btn btn-p" style="width:auto;padding:0 18px;border-radius:12px" onclick="postComment()">Post</button>
+        </div>
+        <div class="comment-list" id="md-comments"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="showView('home')"><i>🏠</i><span data-i18n="home">হোম</span></button>
+  <button class="nav-item" onclick="showView('fav')"><i>❤️</i><span data-i18n="fav">পছন্দ</span></button>
+  <button class="nav-item" onclick="showView('unlock')"><i>🔓</i><span data-i18n="unlock">আনলক</span></button>
+  <button class="nav-item" onclick="showView('viral')"><i>🔥</i><span data-i18n="viralLinks">ভাইরাল লিংক</span></button>
+  <button class="nav-item" onclick="showView('profile')"><i>👤</i><span data-i18n="profile">প্রোফাইল</span></button>
+  <button class="nav-item hidden" id="nav-admin" onclick="showView('admin')"><i>🛠</i><span data-i18n="admin">অ্যাডমিন</span></button>
+</nav>
+
+<div id="toast-container"></div>
+
+<script>
+const ADMIN_ID = 0; // V8: admin authorization comes from the backend
+const STORE_KEY = "VidUnlock_Core_State_V7";
+const BOT_USERNAME = "MiniVideoBot"; // runtime value comes from /api/bootstrap
+
+const API_BASE = '';
+let serverIsAdmin = false;
+let serverIsOwner = false;
+let adminPermissions = {};
+
+function apiHeaders(jsonBody=false){
+  const h = {'X-Telegram-Init-Data': (tg && tg.initData) ? tg.initData : ''};
+  if(jsonBody) h['Content-Type']='application/json';
+  return h;
+}
+async function apiFetch(path, options={}){
+  const opts={...options};
+  opts.headers={...apiHeaders(!!opts.body), ...(opts.headers||{})};
+  const r=await fetch(API_BASE+path, opts);
+  if(!r.ok){ throw new Error((await r.text()) || ('HTTP '+r.status)); }
+  return r.json();
+}
+
+const i18n = {
+  bn: {
+    premiumAccess: "PREMIUM ACCESS",
+    searchPlaceholder: "ভিডিও বা ক্যাটাগরি খুঁজুন...",
+    heroSub: "আপনার পছন্দের প্রিমিয়াম ভিডিওগুলো আনলক করুন একদম ফ্রিতে।",
+    totalVideo: "ভিডিও",
+    unlockedVideo: "আনলক",
+    favVideo: "পছন্দ",
+    allVideos: "সব ভিডিও",
+    myFavs: "❤️ আপনার পছন্দ",
+    unlockedVids: "🔓 আনলক করা",
+    viralLinks: "🔥 ভাইরাল লিংক",
+    home: "হোম",
+    fav: "পছন্দ",
+    unlock: "আনলক",
+    profile: "প্রোফাইল",
+    admin: "অ্যাডমিন",
+    backupDownload: "📥 ব্যাকআপ ডাউনলোড",
+    adminPanel: "🛠 অ্যাডমিন প্যানেল",
+    dashboard: "ড্যাশবোর্ড",
+    manageVideos: "ভিডিও ম্যানেজ",
+    manageCats: "ক্যাটাগরি ম্যানেজ",
+    manageViral: "ভাইরাল লিংক",
+    settings: "সেটিংস",
+    addViralLink: "➕ নতুন ভাইরাল লিংক যোগ করুন",
+    linkTitle: "লিংকের শিরোনাম",
+    linkUrl: "ইউআরএল (URL)",
+    saveLink: "সেভ ভাইরাল লিংক",
+    allViralLinks: "সকল ভাইরাল লিংক তালিকা",
+    visitLink: "লিংকে যান 🚀",
+    delete: "ডিলিট",
+    share: "শেয়ার"
+  },
+  en: {
+    premiumAccess: "PREMIUM ACCESS",
+    searchPlaceholder: "Search videos or categories...",
+    heroSub: "Unlock your favorite premium videos completely for free.",
+    totalVideo: "VIDEOS",
+    unlockedVideo: "UNLOCKED",
+    favVideo: "FAVORITES",
+    allVideos: "All Videos",
+    myFavs: "❤️ Favorites",
+    unlockedVids: "🔓 Unlocked Videos",
+    viralLinks: "🔥 Viral Links",
+    home: "Home",
+    fav: "Favorites",
+    unlock: "Unlocked",
+    profile: "Profile",
+    admin: "Admin",
+    backupDownload: "📥 Backup Download",
+    adminPanel: "🛠 Admin Panel",
+    dashboard: "Dashboard",
+    manageVideos: "Manage Videos",
+    manageCats: "Categories",
+    manageViral: "Viral Links",
+    settings: "Settings",
+    addViralLink: "➕ Add New Viral Link",
+    linkTitle: "Link Title",
+    linkUrl: "URL",
+    saveLink: "Save Link",
+    allViralLinks: "All Viral Links",
+    visitLink: "Visit Link 🚀",
+    delete: "Delete",
+    share: "Share"
+  }
+};
+
+let state = {
+  version: 8,
+  lang: 'bn',
+  categories: [
+    { id: 'cat_all', name: 'সব', icon: '✨', order: 0 },
+    { id: 'cat_viral', name: 'ভাইরাল', icon: '🔥', order: 1 }
+  ],
+  videos: [],
+  viralLinks: [],
+  unlocked: {},
+  progress: {},
+  favorites: {},
+  reactions: {},
+  comments: {},
+  recent: [],
+  adViews: 0,
+  videoRequests: 0,
+  appSettings: {},
+  users: {},
+  settings: { maintenance: false },
+  onlineCount: 1,
+  todayActive: 1
+};
+
+let tg = window.Telegram.WebApp || {};
+let user = tg.initDataUnsafe?.user || { id: 123456, first_name: 'Guest', last_name: '', username: 'guest', photo_url: '' };
+let currentCat = 'cat_all';
+let isAdShowing = false;
+let currentActiveVid = null;
+
+async function initApp() {
+  if (tg.ready) tg.ready();
+  if (tg.expand) tg.expand();
+  
+  const savedLocal = localStorage.getItem(STORE_KEY);
+  if (savedLocal) {
+    try {
+      const parsed = JSON.parse(savedLocal);
+      state = { ...state, ...parsed };
+    } catch(e) {}
+  }
+
+  try {
+    const data = await apiFetch('/api/bootstrap');
+    state.videos = data.videos || [];
+    state.categories = [{ id: 'cat_all', name: 'সব', icon: '✨', order: 0 }, ...(data.categories || []).filter(c=>c.id!=='cat_all')];
+    state.viralLinks = data.viral_links || [];
+    state.appSettings = data.settings || {};
+    state.unlocked = {};
+    (data.unlocked || []).forEach(id => state.unlocked[id]=true);
+    state.favorites = {};
+    (data.favorites || []).forEach(id => state.favorites[id]=true);
+    state.reactions = {};
+    (data.my_reactions || []).forEach(id => state.reactions[id]=true);
+    serverIsAdmin = !!data.is_admin;
+    serverIsOwner = !!data.is_owner;
+    adminPermissions = data.admin_permissions || {};
+    if(data.bot_username) window.RUNTIME_BOT_USERNAME = data.bot_username;
+    if(data.video_bot_username) window.RUNTIME_VIDEO_BOT_USERNAME = data.video_bot_username;
+    if(data.stats){ state.serverStats=data.stats; }
+  } catch (err) {
+    console.error('Server sync failed, using local cache', err);
+  }
+
+  if (serverIsAdmin) {
+    const at=document.getElementById('admin-admins-tab'); if(at) at.style.display=(serverIsOwner||adminPermissions.can_manage_admins)?'':'none';
+    const navAdmin = document.getElementById('nav-admin');
+    if(navAdmin) navAdmin.classList.remove('hidden');
+    const uBadge = document.getElementById('u-badge');
+    if(uBadge) uBadge.style.display = 'inline-block';
+  }
+
+  applyLanguage();
+  updateUserUI();
+  renderCategories();
+  renderAll();
+  await loadPublicSettings();
+  await updatePresence();
+  startPresenceHeartbeat();
+  updateProfileStats();
+
+  handleDeepLink();
+  
+  const loader = document.getElementById('app-loader');
+  if(loader) loader.style.display = 'none';
+}
+
+
+async function loadPublicSettings() {
+  // Settings are loaded together with /api/bootstrap.
+  applyAppSettings();
+}
+
+function applyAppSettings(){
+  const s = state.appSettings || {};
+  const setText=(id,val)=>{const el=document.getElementById(id);if(el&&val)el.textContent=val};
+  setText('brand-title', s.brand_name || 'Viral Video');
+  setText('brand-subtitle', s.brand_subtitle || 'PREMIUM VIDEO HUB');
+  setText('hero-subtitle', s.hero_text || 'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।');
+  setText('online-label', s.online_label || 'Online');
+  const nav = document.querySelectorAll('.bottom-nav .nav-item span');
+  const labels=[s.nav_home||'হোম',s.nav_fav||'পছন্দ',s.nav_unlock||'আনলক',s.nav_viral||'ভাইরাল লিংক',s.nav_profile||'প্রোফাইল'];
+  labels.forEach((x,i)=>{if(nav[i]&&x)nav[i].textContent=x});
+  const op=document.getElementById('online-pill'); if(op) op.style.display=s.show_online===false?'none':'flex';
+  const cs=document.getElementById('comments-section-anchor'); if(cs) cs.style.display=s.comments_enabled===false?'none':'';
+  const rb=document.getElementById('md-react-btn'); if(rb) rb.style.display=s.reactions_enabled===false?'none':'';
+  const fb=document.getElementById('md-fav-btn'); if(fb) fb.style.display=s.favorites_enabled===false?'none':'';
+  const ps=document.querySelector('.profile-stats-grid'); if(ps) ps.style.display=s.profile_stats_enabled===false?'none':'';
+}
+
+async function updatePresence(){
+  if (!user?.id) return;
+  try {
+    const data = await apiFetch('/api/presence', {method:'POST', body:'{}'});
+    state.onlineCount=Math.max(0,Number(data.online||0));
+    state.todayActive=Math.max(0,Number(data.today_active||0));
+    const oc=document.getElementById('online-count'); if(oc)oc.textContent=state.onlineCount;
+    const hc=document.getElementById('hero-online-count'); if(hc)hc.textContent=state.onlineCount;
+    const ao=document.getElementById('ad-stat-online'); if(ao)ao.textContent=state.onlineCount;
+    const at=document.getElementById('ad-stat-today'); if(at)at.textContent=state.todayActive;
+    const au=document.getElementById('ad-stat-u'); if(au&&data.total_users!==undefined)au.textContent=data.total_users;
+    const ar=document.getElementById('ad-stat-av'); if(ar&&data.video_requests!==undefined)ar.textContent=data.video_requests;
+  } catch(e){ console.warn('presence update failed',e); }
+}
+
+let presenceTimer=null;
+function startPresenceHeartbeat(){
+  if(presenceTimer) clearInterval(presenceTimer);
+  presenceTimer=setInterval(()=>{if(document.visibilityState==='visible')updatePresence()},30000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')updatePresence()});
+}
+
+function handleDeepLink() {
+  // IMPORTANT: Main/root URL must ALWAYS open Home.
+  // Only Telegram start_param or an explicit ?startapp= package code may open a package.
+  let startCode = null;
+  if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+    startCode = String(tg.initDataUnsafe.start_param || '').trim();
+  }
+  if (!startCode) {
+    const urlParams = new URLSearchParams(window.location.search);
+    startCode = String(urlParams.get('startapp') || '').trim();
+  }
+  if (!startCode) {
+    showView('home');
+    return;
+  }
+
+  setTimeout(async () => {
+    // V9 primary package link: https://t.me/BOT?startapp=v...
+    let found = state.videos.find(v => v.share_code === startCode || v.id === startCode);
+
+    // Backward compatibility only: older video_xxx links may still resolve.
+    if (!found) {
+      try {
+        const r = await apiFetch('/api/resolve-start/' + encodeURIComponent(startCode));
+        if (r.video_id) found = state.videos.find(v => v.id === r.video_id);
+        if (!found && r.storage_ready && startCode.startsWith('video_')) {
+          showStartReadyState(startCode);
+          return;
+        }
+      } catch(e) { console.warn('start resolver failed', e); }
+    }
+
+    if (found) {
+      openDetail(found.id);
+    } else {
+      showPackageUnavailable();
+    }
+  }, 220);
+}
+
+function showPackageUnavailable(){
+  showView('home');
+  const old=document.getElementById('package-unavailable-toast');
+  if(old) old.remove();
+  const box=document.createElement('div');
+  box.id='package-unavailable-toast';
+  box.style.cssText='position:fixed;left:14px;right:14px;top:82px;z-index:9998;background:linear-gradient(135deg,rgba(25,29,52,.98),rgba(41,25,75,.98));border:1px solid rgba(160,125,255,.35);box-shadow:0 18px 50px rgba(0,0,0,.42);border-radius:18px;padding:14px 15px;color:#fff;display:flex;gap:12px;align-items:center;';
+  box.innerHTML=`<div style="width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(124,77,255,.18);font-size:22px">🎬</div><div style="flex:1"><div style="font-weight:800;font-size:14px">এই ভিডিওটি এখন পাওয়া যাচ্ছে না</div><div style="font-size:11px;color:#b9bdd2;margin-top:3px">অন্য ট্রেন্ডিং ভিডিওগুলো নিচে দেখতে পারেন।</div></div><button onclick="this.parentElement.remove()" style="border:0;background:rgba(255,255,255,.08);color:white;width:32px;height:32px;border-radius:10px">✕</button>`;
+  document.body.appendChild(box);
+  setTimeout(()=>{if(box.isConnected)box.remove()},6500);
+}
+
+function showStartReadyState(code){
+  const botName = window.RUNTIME_BOT_USERNAME || BOT_USERNAME;
+  const link = `https://t.me/${botName}?start=${encodeURIComponent(code)}`;
+  const errDiv = document.createElement('div');
+  errDiv.className='v8-start-ready';
+  errDiv.innerHTML=`<div class="v8-ready-card"><div class="v8-ready-icon">🎬</div><div class="v8-ready-badge">VIDEO READY</div><h2>ভিডিও প্রস্তুত আছে</h2><p>এই ভিডিওটি Private Bot delivery-এর মাধ্যমে পাওয়া যাবে। নিচের বাটনে চাপুন।</p><button onclick="Telegram.WebApp.openTelegramLink('${link}')">▶ Bot-এ ভিডিও নিন</button><button class="ghost" onclick="this.closest('.v8-start-ready').remove()">হোমে থাকুন</button></div>`;
+  document.body.appendChild(errDiv);
+}
+
+function showUserFriendlyError(message) {
+  console.warn(message);
+  showPackageUnavailable();
+}
+
+function saveState() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+function toggleLanguage() {
+  state.lang = state.lang === 'bn' ? 'en' : 'bn';
+  saveState();
+  applyLanguage();
+}
+
+function applyLanguage() {
+  const currentLang = state.lang;
+  const langToggleBtn = document.getElementById('lang-toggle-btn');
+  if(langToggleBtn) langToggleBtn.textContent = currentLang === 'bn' ? '🌐 EN' : '🌐 BN';
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (i18n[currentLang] && i18n[currentLang][key]) {
+      el.textContent = i18n[currentLang][key];
+    }
+  });
+
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    if (i18n[currentLang] && i18n[currentLang][key]) {
+      el.placeholder = i18n[currentLang][key];
+    }
+  });
+
+  const heroWelcome = document.getElementById('hero-welcome');
+  if(heroWelcome) heroWelcome.textContent = currentLang === 'bn' ? `হ্যালো! 👋` : `Hello! 👋`;
+}
+
+function renderCategories() {
+  const container = document.getElementById('category-tabs');
+  if(container) {
+    container.innerHTML = state.categories.map(c => `
+      <button class="tab ${currentCat === c.id ? 'active' : ''}" onclick="switchCat('${c.id}')">
+        ${c.icon} ${c.name}
+      </button>
+    `).join('');
+  }
+  
+  const select = document.getElementById('av-cat');
+  if(select) {
+    select.innerHTML = state.categories.filter(c => c.id !== 'cat_all').map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+}
+
+function createVideoCard(v) {
+  const isUnlocked = !!state.unlocked[v.id];
+  const isFav = !!state.favorites[v.id];
+  const viewsCount = Number(v.views || 0);
+  const reacts = Number(v.reaction_count || 0);
+  const comments = Number(v.comment_count || 0);
+  const reqAds = Number(v.required_ads || state.appSettings?.required_ads_default || 1);
+  const catObj = state.categories.find(c => c.id === v.category_id || c.id === v.categoryId);
+  const catName = catObj ? catObj.name : 'ভিডিও';
+  const desc = (v.thumb_text || '').trim() || `${catName} · Premium Video`;
+  return `
+    <article class="gallery-card">
+      <div class="gallery-thumb" onclick="openDetail('${v.id}')">
+        <img src="${v.thumb || ''}" loading="lazy" alt="${escapeHtml(v.title||'Video')}" onerror="this.style.opacity=.16">
+        <div class="gallery-badges"><span class="gallery-badge hot">${v.trending?'🔥 TRENDING':'🎬 NEW'}</span><span class="gallery-badge">${isUnlocked?'🔓 OPEN':'🔒 '+reqAds+' AD'}</span></div>
+        <div class="gallery-play"><span>▶</span></div>
+      </div>
+      <div class="gallery-body" onclick="openDetail('${v.id}')">
+        <div class="gallery-title">${escapeHtml(v.title)}</div>
+        <div class="gallery-desc">${escapeHtml(desc)}</div>
+        <div class="gallery-meta"><span>👁 ${viewsCount}</span><span>❤️ ${reacts}</span><span>💬 ${comments}</span>${isFav?'<span>★</span>':''}</div>
+      </div>
+      <div class="gallery-actions">
+        <button class="gallery-watch" onclick="openDetail('${v.id}')">${isUnlocked?'▶ ভিডিও নিন':'🔐 আনলক করুন'}</button>
+        <button class="gallery-share" onclick="event.stopPropagation();shareVideo('${v.id}')">↗</button>
+      </div>
+    </article>`;
+}
+
+function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+
+function renderAll() {
+  renderHome();
+  renderFavs();
+  renderUnlocked();
+  renderViralLinks();
+  renderAdmin();
+  updateStats();
+}
+
+function renderHome() {
+  const grid = document.getElementById('main-grid');
+  if(grid) grid.classList.add('gallery-grid');
+  if(!grid) return;
+  let vids = state.videos;
+  if (currentCat !== 'cat_all') {
+    vids = vids.filter(v => (v.category_id === currentCat || v.categoryId === currentCat));
+  }
+  grid.innerHTML = vids.length ? vids.map(createVideoCard).join('') : '<div class="empty-state"><i>📹</i>No videos found</div>';
+}
+
+function renderFavs() {
+  const grid = document.getElementById('fav-grid');
+  if(!grid) return;
+  const vids = state.videos.filter(v => state.favorites[v.id]);
+  grid.innerHTML = vids.length ? vids.map(createVideoCard).join('') : '<div class="empty-state"><i>❤️</i>No favorites yet</div>';
+}
+
+function renderUnlocked() {
+  const grid = document.getElementById('unlock-grid');
+  if(!grid) return;
+  const vids = state.videos.filter(v => state.unlocked[v.id]);
+  grid.innerHTML = vids.length ? vids.map(createVideoCard).join('') : '<div class="empty-state"><i>🔓</i>No unlocked videos</div>';
+}
+
+function renderViralLinks() {
+  const cont = document.getElementById('viral-links-list');
+  if(!cont) return;
+  const links = state.viralLinks || [];
+  
+  if (!links.length) {
+    cont.innerHTML = '<div class="empty-state"><i>🔗</i>কোনো ভাইরাল লিংক যুক্ত করা হয়নি</div>';
+    return;
+  }
+
+  cont.innerHTML = links.map(l => `
+    <div class="viral-card">
+      <div class="viral-info">
+        <div class="viral-icon">🔥</div>
+        <div>
+          <div class="viral-title">${l.title}</div>
+          <div class="viral-url">${l.url}</div>
+        </div>
+      </div>
+      <button class="btn btn-s" style="width:auto;padding:8px 14px;font-size:12px" onclick="watchExternal('${l.url}')">
+        ${state.lang==='bn'?'ওপেন লিংক 🚀':'Open 🚀'}
+      </button>
+    </div>
+  `).join('');
+}
+
+async function openDetail(id) {
+  let v = state.videos.find(x => x.id === id);
+  
+  if (!v) {
+    showPackageUnavailable();
+    return;
+  }
+
+  currentActiveVid = v;
+
+  const viewedKey = `viewed_video_${id}`;
+  if (!sessionStorage.getItem(viewedKey)) {
+    sessionStorage.setItem(viewedKey, 'true');
+    
+    if (!v.views) v.views = {};
+    if (typeof v.views === 'object') {
+      v.views[user.id] = true;
+    }
+    
+    try { await apiFetch('/api/views/'+encodeURIComponent(id), {method:'POST', body:'{}'}); } catch(e) {}
+    if(typeof v.views==='number') v.views += 1;
+    saveState();
+  }
+
+  updateDetailUI(v);
+  const modal = document.getElementById('modal-detail');
+  if(modal) modal.classList.add('open');
+}
+
+async function updateDetailUI(v) {
+  const titleEl = document.getElementById('md-title');
+  if(titleEl) titleEl.textContent = v.title;
+  const viewsCount = v.views ? (typeof v.views === 'object' ? Object.keys(v.views).length : (Number(v.views) || 0)) : 0;
+  const metricViews = document.getElementById('md-metric-views');
+  if(metricViews) metricViews.textContent = viewsCount;
+  const metricProg = document.getElementById('md-metric-prog');
+  if(metricProg) metricProg.textContent = 'LINK';
+  const catObj = state.categories.find(c => c.id === v.category_id || c.id === v.categoryId);
+  const metricCat = document.getElementById('md-metric-cat');
+  if(metricCat) metricCat.textContent = catObj ? catObj.name : 'General';
+
+  const favBtn = document.getElementById('md-fav-btn');
+  if(favBtn) {
+    favBtn.textContent = state.favorites[v.id] ? "❤️" : "🤍";
+    favBtn.onclick = () => { toggleFav(v.id); favBtn.classList.add('animate-beat'); setTimeout(() => favBtn.classList.remove('animate-beat'), 300); };
+  }
+  let hasReacted=!!state.reactions[v.id];
+  try{
+    const social=await apiFetch('/api/videos/'+encodeURIComponent(v.id)+'/social');
+    hasReacted=!!social.reacted; state.reactions[v.id]=hasReacted; state.favorites[v.id]=!!social.favorite;
+    v.reaction_count=Number(social.reaction_count||0); v.comment_count=Number(social.comment_count||0);
+  }catch(e){}
+  const reactBtn = document.getElementById('md-react-btn');
+  if(reactBtn) {reactBtn.style.color = hasReacted ? '#ff5f8f' : 'inherit'; reactBtn.classList.toggle('active',hasReacted);}
+  const reactCount = document.getElementById('md-react-count');
+  if(reactCount) reactCount.textContent = Number(v.reaction_count||0);
+
+  const mediaCont = document.getElementById('md-media-container');
+  if(mediaCont) mediaCont.innerHTML = `<div class="v192-media-shell"><img src="${v.thumb || ''}" alt="Video thumbnail"><div class="v192-demo-badge">🤍 Demo</div><div class="v192-duration">${escapeHtml(v.duration_text||v.duration||'')}</div><div class="v192-play">▶</div>${v.thumb_text?`<div class="thumb-caption-overlay" style="bottom:52px"><span>${escapeHtml(v.thumb_text)}</span></div>`:''}<div class="v192-protected">🔒 Protected Video</div></div>`;
+  const sub=document.getElementById('md-subtitle'); if(sub) sub.textContent = v.description || v.subtitle || 'সাবস্ক্রাইবারদের জন্য স্পেশাল ভিডিও 🤗';
+
+  const actionArea = document.getElementById('md-action-area');
+  if(actionArea) { actionArea.innerHTML = '<div class="v192-loading">ভিডিও প্রস্তুত করা হচ্ছে…</div>'; await renderAdGate(v); }
+  renderComments(v.id);
+}
+
+async function ensureMonetagSdk(zoneId){
+  const zone=String(zoneId||'11404425').trim();
+  const fn='show_'+zone;
+  if(typeof window[fn]==='function') return fn;
+  const old=document.querySelector('script[data-monetag-dynamic="1"]'); if(old) old.remove();
+  await new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src='https://libtl.com/sdk.js';sc.dataset.zone=zone;sc.dataset.sdk=fn;sc.dataset.monetagDynamic='1';sc.onload=resolve;sc.onerror=()=>reject(new Error('Monetag SDK load হয়নি'));document.head.appendChild(sc);});
+  if(typeof window[fn]!=='function') throw new Error('Monetag SDK ready হয়নি');
+  return fn;
+}
+
+async function renderAdGate(v){
+  const area=document.getElementById('md-action-area'); if(!area||!v)return;
+  area.innerHTML='<div class="v192-loading">ভিডিও প্রস্তুত করা হচ্ছে…</div>';
+  try{
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),8000);
+    let st;
+    try{ st=await apiFetch('/api/videos/'+encodeURIComponent(v.id)+'/ad-status',{signal:controller.signal}); }
+    finally { clearTimeout(timeoutId); }
+
+    const a=st.adsgram||{}, m=st.monetag||{};
+    const ui=state.appSettings||{};
+    const fmt=(txt,vals)=>Object.entries(vals).reduce((out,[k,val])=>String(out||'').split('{'+k+'}').join(String(val)),txt||'');
+    const enabled=[a,m].filter(x=>x&&x.enabled);
+    const required=enabled.reduce((n,x)=>n+Number(x.required||0),0);
+    const completed=enabled.reduce((n,x)=>n+Math.min(Number(x.completed||0),Number(x.required||0)),0);
+    const remaining=Math.max(0,required-completed);
+    const title=ui.video_access_title||'🎁 Video Access';
+    const instruction=ui.video_access_instruction||'ভিডিওটি দেখার জন্য প্রয়োজনীয় Ad গুলো দেখুন';
+    const secure=ui.video_access_secure_text||'🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়';
+    const adBtn=ui.ad_watch_button_text||'📢 Ad দেখুন';
+    const watchBtn=ui.watch_video_button_text||'🎬 ভিডিও দেখুন';
+    const seen=fmt(ui.ad_progress_seen_text||'আপনার {completed}টি Ad দেখা হয়েছে ✅',{completed,remaining,required});
+    const remain=fmt(ui.ad_progress_remaining_text||'আরও {remaining}টি Ad বাকি — ভিডিও দেখতে বাকি Ad গুলো দেখুন।',{completed,remaining,required});
+    if(st.unlocked || remaining===0){
+      const done=escapeHtml(ui.all_ads_done_text||'✅ সব Ad সম্পন্ন হয়েছে\nআপনার ভিডিও আনলক হয়েছে').replace(/\n/g,'<br>');
+      area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">${escapeHtml(title)}</div><div class="v192-unlock-sub">${done}</div></div></div><button class="v192-main-action" onclick="openUnlockedVideo('${v.id}')">${escapeHtml(watchBtn)}</button><div class="v192-secure">${escapeHtml(secure)}</div></div>`;
+      return;
+    }
+    const providers=[];
+    if(a.enabled && Number(a.completed||0)<Number(a.required||0)) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">AdsGram</div><div class="v192-provider-progress">${a.completed}/${a.required}</div></div><button class="btn btn-p" id="adsgram-watch-btn" onclick="watchProviderAd('${v.id}','adsgram')">${escapeHtml(adBtn)}</button></div>`);
+    if(m.enabled && Number(m.completed||0)<Number(m.required||0)) providers.push(`<div class="v192-provider"><div><div class="v192-provider-name">Monetag</div><div class="v192-provider-progress">${m.completed}/${m.required}</div></div><button class="btn btn-p" id="monetag-watch-btn" onclick="watchProviderAd('${v.id}','monetag')">${escapeHtml(adBtn)}</button></div>`);
+    area.innerHTML=`<div class="v192-unlock-card"><div class="v192-unlock-head"><div class="v192-unlock-icon">🎬</div><div class="v192-unlock-copy"><div class="v192-unlock-title">${escapeHtml(title)}</div><div class="v192-unlock-sub">${escapeHtml(instruction)}</div></div></div><div style="margin:12px 0 8px;font-size:13px;line-height:1.7"><b>${escapeHtml(seen)}</b><br>${escapeHtml(remain)}</div><div class="v192-provider-stack">${providers.join('')}</div><div class="v192-secure">${escapeHtml(secure)}</div></div>`;
+  }catch(e){
+    console.error('Ad status load failed',e);
+    const msg=(e&&e.name==='AbortError')?'ভিডিও অ্যাক্সেস লোড হতে একটু সময় লাগছে':'ভিডিও অ্যাক্সেস এখন পাওয়া যাচ্ছে না';
+    area.innerHTML=`<div class="v192-error"><b>${msg}</b><div>ইন্টারনেট ঠিক থাকলে আবার চেষ্টা করুন।</div><button class="btn btn-g" style="margin-top:10px" onclick="renderAdGate(currentActiveVid)">🔄 আবার চেষ্টা করুন</button></div>`;
+  }
+}
+
+async function watchProviderAd(videoId,provider){
+  const id=provider==='monetag'?'monetag-watch-btn':'adsgram-watch-btn'; const btn=document.getElementById(id); if(btn){btn.disabled=true;btn.textContent=(state.appSettings?.ad_watch_button_text||'📢 Ad দেখুন');}
+  try{
+    const sess=await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/ad-session',{method:'POST',body:JSON.stringify({provider})});
+    if(sess.bypass){await renderAdGate(currentActiveVid);return;}
+    if(provider==='adsgram'){
+      if(!window.Adsgram||!window.Adsgram.init) throw new Error('AdsGram SDK load হয়নি');
+      const controller=window.Adsgram.init({blockId:sess.block_id||'int-45179'}); const result=await controller.show();
+      if(result&&result.done===false) throw new Error('AdsGram Ad complete হয়নি');
+    }else{
+      const fn=await ensureMonetagSdk(sess.zone_id||'11404425');
+      const result=await window[fn]();
+      if(result===false || (result&&result.done===false)) throw new Error('Monetag Ad complete হয়নি');
+      // V20 NO-WAIT UPDATE: ad success unlocks immediately; no post-ad countdown.
+    }
+    await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/ad-complete',{method:'POST',body:JSON.stringify({session_token:sess.session_token,provider})});
+    await renderAdGate(currentActiveVid); updateProfileStats();
+  }catch(e){console.error(e);let msg=e?.message||'Ad দেখানো যায়নি';if(/no ads|currently no ads/i.test(msg))msg='এই মুহূর্তে Ad পাওয়া যাচ্ছে না—কিছুক্ষণ পর আবার চেষ্টা করুন';showToast(msg,'danger');if(btn){btn.disabled=false;btn.textContent='🔄 আবার চেষ্টা করুন';}}
+}
+async function watchAdsGram(videoId){return watchProviderAd(videoId,'adsgram');}
+
+
+async function openUnlockedVideo(videoId){
+  try{
+    const r=await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/unlock-url');
+    if(!r.url) return showToast('Video link পাওয়া যায়নি','warning');
+    try{await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/unlock-click',{method:'POST',body:'{}'});}catch(e){}
+    if(r.mode==='video_bot'){
+      showToast('Video Bot খুলছে…','success');
+      if(window.Telegram?.WebApp?.openTelegramLink) Telegram.WebApp.openTelegramLink(r.url); else window.location.href=r.url;
+      setTimeout(()=>{try{Telegram.WebApp.close();}catch(e){}},350);
+    } else { watchExternal(r.url); }
+  }catch(e){showToast(e.message||'আগে Ad complete করুন','warning');}
+}
+
+function handleTelegramClick(vidId) {
+  const viewedKey = `viewed_video_${vidId}`;
+  if (!sessionStorage.getItem(viewedKey)) {
+    sessionStorage.setItem(viewedKey, 'true');
+    const v = state.videos.find(x => x.id === vidId);
+    if (v) {
+      if (!v.views) v.views = {};
+      if (typeof v.views === 'object') v.views[user.id] = true;
+      apiFetch('/api/views/'+encodeURIComponent(vidId), {method:'POST', body:'{}'}).catch(()=>{});
+      saveState();
+    }
+  }
+}
+
+function shareVideo(vidId) {
+  const v = state.videos.find(x => x.id === vidId);
+  if (!v) return;
+
+  const shareLink = v.share_link || (v.share_code ? `https://t.me/${window.RUNTIME_BOT_USERNAME || BOT_USERNAME}?startapp=${v.share_code}` : `https://t.me/${window.RUNTIME_BOT_USERNAME || BOT_USERNAME}?startapp=${encodeURIComponent(v.id)}`);
+  const shareText = `🔥 প্রিমিয়াম ভিডিও: ${v.title}\n\nফ্রিতে দেখতে এখানে ক্লিক করুন 👇\n${shareLink}`;
+
+  if (tg.openTelegramLink && typeof tg.switchInlineQuery === 'function') {
+    try {
+      tg.switchInlineQuery(shareText, ['users', 'groups', 'channels']);
+      return;
+    } catch (e) {}
+  }
+
+  if (navigator.share) {
+    navigator.share({
+      title: v.title,
+      text: `ফ্রিতে প্রিমিয়াম ভিডিও দেখুন: ${v.title}`,
+      url: shareLink,
+    }).then(() => {
+      showToast("সফলভাবে শেয়ার করা হয়েছে! ✅", "success");
+    }).catch((error) => {
+      if (error.name !== 'AbortError') {
+        fallbackCopyShareLink(shareLink);
+      }
+    });
+  } else {
+    fallbackCopyShareLink(shareLink);
+  }
+}
+
+function fallbackCopyShareLink(url) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast("লিংকটি ক্লিপবোর্ডে কপি করা হয়েছে! 📋", "success");
+    }).catch(() => {
+      promptCopy(url);
+    });
+  } else {
+    promptCopy(url);
+  }
+}
+
+function promptCopy(url) {
+  const promptWindow = prompt("শেয়ার করার জন্য নিচের লিংকটি কপি করুন:", url);
+  if (promptWindow) {
+    showToast("লিংক কপি করা হয়েছে! ✅", "success");
+  }
+}
+
+async function toggleReaction() {
+  if(!currentActiveVid) return;
+  try{
+    const r=await apiFetch('/api/videos/'+encodeURIComponent(currentActiveVid.id)+'/reaction',{method:'POST',body:'{}'});
+    state.reactions[currentActiveVid.id]=!!r.active;
+    currentActiveVid.reaction_count=Number(r.count||0);
+    await updateDetailUI(currentActiveVid); renderHome(); updateProfileStats();
+  }catch(e){showToast('রিয়েকশন সেভ হয়নি','warning');}
+}
+
+function openVideoShortLink() {
+  if (!currentActiveVid) return;
+  const url = currentActiveVid.short_url || currentActiveVid.short_link || currentActiveVid.link;
+  if (!url) return showToast("এই ভিডিওর Short Link এখনো যোগ করা হয়নি", "warning");
+  watchExternal(url);
+}
+
+async function openUnlockLink(videoId, link){
+  try{await apiFetch('/api/videos/'+encodeURIComponent(videoId)+'/unlock-click',{method:'POST',body:'{}'});}catch(e){}
+  watchExternal(link);
+}
+
+function watchExternal(link) {
+  if (!link) return;
+  let finalLink = link;
+  if (!finalLink.startsWith('http://') && !finalLink.startsWith('https://')) {
+    finalLink = 'https://' + finalLink;
+  }
+  if (tg.openLink) {
+    tg.openLink(finalLink);
+  } else {
+    window.open(finalLink, '_blank');
+  }
+}
+
+function renderThumbPreview(){
+  const p=document.getElementById('av-thumb-prev'); if(!p)return;
+  const src=p._data||''; const txt=(document.getElementById('av-thumb-text')?.value||'').trim();
+  if(!src){p.innerHTML=txt?`<div class="thumb-preview-wrap" style="background:#090d18"><div class="thumb-prev-text"><span>${escapeHtml(txt)}</span></div></div>`:'<span>Preview</span>';return;}
+  p.innerHTML=`<div class="thumb-preview-wrap"><img src="${src}">${txt?`<div class="thumb-prev-text"><span>${escapeHtml(txt)}</span></div>`:''}</div>`;
+}
+function updateThumbTextPreview(){renderThumbPreview();}
+
+let autoDraftCache=[];
+async function loadAutoDrafts(){
+  const c=document.getElementById('auto-draft-list'); if(!c)return;
+  c.innerHTML='<div class="empty-state" style="padding:18px 8px">Loading...</div>';
+  try{
+    const d=await apiFetch('/api/admin/drafts'); autoDraftCache=d.drafts||[];
+    c.innerHTML=autoDraftCache.length?autoDraftCache.map((x,i)=>`<div class="draft-card">${x.thumb?`<img class="draft-thumb" src="${x.thumb}">`:`<div class="draft-thumb" style="display:grid;place-items:center">🎬</div>`}<div class="draft-meta"><b>${escapeHtml(x.title||x.video_code)}</b><small>${escapeHtml(x.video_code)}${x.caption_text?' · caption ready':''}${x.uploader_label?' · '+escapeHtml(x.uploader_label):''}</small><button class="btn btn-g draft-use" onclick="useAutoDraftByIndex(${i})">✨ Auto Draft ব্যবহার করুন</button></div></div>`).join(''):'<div class="empty-state" style="padding:18px 8px">নতুন pending draft নেই</div>';
+  }catch(e){c.innerHTML='<div class="empty-state" style="padding:18px 8px">Draft load হয়নি</div>';showToast('Auto Draft load হয়নি','danger');}
+}
+function useAutoDraftByIndex(i){
+  const x=autoDraftCache[i]; if(!x)return;
+  editingVideoId=null;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||''};
+  set('av-title',x.title||'নতুন ভিডিও'); set('av-video-code',x.video_code); set('av-deep-link',x.deep_link); set('av-thumb-text',x.caption_text||'');
+  const p=document.getElementById('av-thumb-prev'); if(p){p._data=x.thumb||'';renderThumbPreview();}
+  const dm=document.getElementById('av-delivery-mode'); if(dm)dm.value='video_bot';
+  showToast('Auto Thumbnail Draft বসানো হয়েছে ✅','success');
+  document.getElementById('av-title')?.focus();
+}
+
+
+function toggleVideoSourceInput() {}
+
+let editingVideoId=null;
+function editVideo(id){
+  const v=state.videos.find(x=>x.id===id); if(!v)return;
+  editingVideoId=id;
+  document.getElementById('av-title').value=v.title||'';
+  document.getElementById('av-cat').value=v.category_id||'';
+  document.getElementById('av-video-code').value=v.video_code||'';
+  document.getElementById('av-deep-link').value=v.deep_link||'';
+  document.getElementById('av-short-link').value=v.short_url||'';document.getElementById('av-thumb-text').value=v.thumb_text||'';const dm=document.getElementById('av-delivery-mode');if(dm)dm.value=v.delivery_mode||'video_bot';
+  document.getElementById('av-required-ads').value=Number(v.required_ads??1);
+  document.getElementById('av-broadcast').checked=!!v.broadcast_enabled;
+  document.getElementById('av-featured').checked=!!v.featured;
+  document.getElementById('av-trending').checked=v.trending!==false;
+  document.getElementById('av-published').checked=v.published!==false;
+  const prev=document.getElementById('av-thumb-prev'); if(prev){prev._data=v.thumb||''; renderThumbPreview();}
+  const b=document.getElementById('upload-btn'); if(b)b.textContent='✅ Package Update করুন';
+  document.getElementById('cancel-edit-btn')?.classList.remove('hidden');
+  switchAdminSubView('vids'); window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelVideoEdit(){ editingVideoId=null; ['av-title','av-video-code','av-deep-link','av-short-link','av-thumb-text'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';}); const p=document.getElementById('av-thumb-prev');if(p){p.innerHTML='<span>Preview</span>';p._data=null;} document.getElementById('upload-btn').textContent='ভিডিও Package Publish করুন';document.getElementById('cancel-edit-btn')?.classList.add('hidden'); }
+async function rebroadcastVideo(id){try{await apiFetch('/api/admin/videos/'+encodeURIComponent(id)+'/rebroadcast',{method:'POST',body:'{}'});showToast('Re-Broadcast queue হয়েছে ✅','success');}catch(e){showToast('Re-Broadcast হয়নি','danger');}}
+
+async function saveVideo() {
+  const title=(document.getElementById('av-title').value||'').trim(),catId=document.getElementById('av-cat').value;
+  let videoCode=(document.getElementById('av-video-code').value||'').trim(),deepLink=(document.getElementById('av-deep-link').value||'').trim();
+  const shortUrl=(document.getElementById('av-short-link').value||'').trim(), broadcastEnabled=!!document.getElementById('av-broadcast').checked;
+  const requiredAds=Math.max(0,Math.min(10,parseInt(document.getElementById('av-required-ads').value||'1')));
+  const thumbPrev=document.getElementById('av-thumb-prev'), thumbBase64=thumbPrev?thumbPrev._data:'';
+  if(!title)return showToast('ভিডিওর শিরোনাম দিন'); if(!videoCode&&deepLink){const m=deepLink.match(/[?&]start=(video_[A-Za-z0-9_-]+)/);if(m)videoCode=m[1];} if(!videoCode)return showToast('video_xxx code দিন');
+  const botName=window.RUNTIME_BOT_USERNAME||BOT_USERNAME;if(!deepLink)deepLink=`https://t.me/${botName}?start=${videoCode}`;
+  const deliveryMode=document.getElementById('av-delivery-mode')?.value||'video_bot'; if(deliveryMode==='short_link'&&!shortUrl)return showToast('Short Link দিন');
+  const old=editingVideoId?state.videos.find(v=>v.id===editingVideoId):null;
+  const thumbText=(document.getElementById('av-thumb-text')?.value||'').trim(); const vidData={id:editingVideoId||('post_'+Date.now()),share_code:old?.share_code,video_code:videoCode,title,category_id:catId,thumb:thumbBase64||old?.thumb||'',thumb_text:thumbText,deep_link:deepLink,short_url:shortUrl,delivery_mode:deliveryMode,broadcast_enabled:broadcastEnabled,published:document.getElementById('av-published').checked,featured:document.getElementById('av-featured').checked,trending:document.getElementById('av-trending').checked,required_ads:requiredAds,views:old?.views||0};
+  try{const saved=await apiFetch('/api/admin/videos',{method:'POST',body:JSON.stringify(vidData)});vidData.id=saved.id||vidData.id;vidData.share_code=saved.share_code;vidData.share_link=saved.share_link; if(old){Object.assign(old,vidData);}else{const same=state.videos.find(x=>x.id===vidData.id||x.video_code===vidData.video_code);if(same)Object.assign(same,vidData);else state.videos.unshift(vidData);} const out=document.getElementById('av-generated-share');if(out)out.value=saved.share_link||'';saveState();renderAll();showToast(old?'Package Update হয়েছে ✅':'Package Publish হয়েছে ✅','success');cancelVideoEdit();}catch(err){console.error(err);showToast('সেভ হয়নি: '+(err.message||'API error'),'danger');}
+}
+
+async function deleteVideo(id) {
+  if(!confirm('ডিলিট করতে চান?'))return;
+  try{await apiFetch('/api/admin/videos/'+encodeURIComponent(id),{method:'DELETE'});}catch(e){return showToast('ডিলিট হয়নি','danger');}
+  state.videos=state.videos.filter(v=>v.id!==id);saveState();renderAll();showToast('ভিডিও ডিলিট হয়েছে! 🗑️','success');
+}
+
+async function saveCategory() {
+  const nameInput=document.getElementById('ac-name'),iconInput=document.getElementById('ac-icon');
+  const name=nameInput?nameInput.value.trim():'',icon=iconInput?(iconInput.value||'📁'):'📁';
+  if(!name)return showToast('ক্যাটাগরির নাম দিন');
+  const catData={id:'cat_'+Date.now(),name,icon,order:state.categories.length};
+  try{await apiFetch('/api/admin/categories',{method:'POST',body:JSON.stringify(catData)});}catch(e){return showToast('ক্যাটাগরি সেভ হয়নি','danger');}
+  state.categories.push(catData);saveState();renderCategories();showToast('ক্যাটাগরি সেভ হয়েছে! ✅','success');
+  if(nameInput)nameInput.value='';if(iconInput)iconInput.value='';
+}
+
+async function saveViralLink() {
+  const titleInput=document.getElementById('avl-title'),urlInput=document.getElementById('avl-url');
+  const title=titleInput?titleInput.value.trim():'',url=urlInput?urlInput.value.trim():'';
+  if(!title||!url)return showToast('টাইটেল এবং লিংক ইউআরএল প্রবেশ করুন');
+  const linkData={id:'vl_'+Date.now(),title,url};
+  try{await apiFetch('/api/admin/viral-links',{method:'POST',body:JSON.stringify(linkData)});}catch(e){return showToast('লিংক সেভ হয়নি','danger');}
+  state.viralLinks=state.viralLinks||[];state.viralLinks.unshift(linkData);saveState();renderAll();showToast('ভাইরাল লিংক সেভ হয়েছে! 🔥','success');
+  if(titleInput)titleInput.value='';if(urlInput)urlInput.value='';
+}
+
+async function deleteViralLink(id) {
+  if(!confirm('ভাইরাল লিংকটি ডিলিট করতে চান?'))return;
+  try{await apiFetch('/api/admin/viral-links/'+encodeURIComponent(id),{method:'DELETE'});}catch(e){return showToast('ডিলিট হয়নি','danger');}
+  state.viralLinks=state.viralLinks.filter(l=>l.id!==id);saveState();renderAll();showToast('ভাইরাল লিংক ডিলিট হয়েছে! 🗑️','success');
+}
+
+function renderAdmin() {
+  if (!serverIsAdmin) return;
+  loadAdminSettings();
+  
+  const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setEl('ad-stat-v', state.videos.length);
+  if(state.serverStats){setEl('ad-stat-u',state.serverStats.total_users||0);setEl('ad-stat-av',state.serverStats.video_requests||0);setEl('ad-stat-unlocks',state.serverStats.unlocks||0);setEl('ad-stat-unlocks-today',state.serverStats.unlocks_today||0);setEl('ad-stat-ads',state.serverStats.ads_watched||0);setEl('ad-stat-ads-today',state.serverStats.ads_watched_today||0);setEl('ad-stat-reactions',state.serverStats.reactions||0);setEl('ad-stat-comments',state.serverStats.comments||0);}
+  setEl('ad-stat-c', state.categories.length);
+  if(!document.getElementById('ad-stat-u')?.textContent) setEl('ad-stat-u', 0);
+  if(!document.getElementById('ad-stat-av')?.textContent) setEl('ad-stat-av', 0);
+
+  const vidListCont = document.getElementById('admin-vid-list');
+  if (vidListCont) {
+    vidListCont.innerHTML = state.videos.length ? state.videos.map(v => {
+      const vCount = v.views ? (typeof v.views === 'object' ? Object.keys(v.views).length : (Number(v.views) || 0)) : 0;
+      const uCount = Object.keys(state.unlocked || {}).filter(k => k === v.id && state.unlocked[k]).length;
+      const rCount = Number(v.reaction_count || 0);
+      const cCount = Number(v.comment_count || 0);
+      const vType = (v.delivery_mode||'video_bot')==='video_bot'?'VIDEO BOT':'SHORT LINK';
+
+      return `
+        <div class="admin-list-item" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="admin-list-info">
+              <img src="${v.thumb || ''}" class="admin-list-thumb">
+              <div style="font-size:12px;font-weight:600;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.title}</div>
+            </div>
+            <div style="display:flex;gap:6px"><button class="btn btn-g" style="width:auto;padding:6px 10px;font-size:11px" onclick="editVideo('${v.id}')">✏️ Edit</button><button class="btn btn-d" style="width:auto;padding:6px 10px;font-size:11px" onclick="deleteVideo('${v.id}')">ডিলিট</button></div>
+          </div>
+          <div style="font-size:10px;color:var(--primary-2)">Type: PACKAGE + ${vType}</div><div style="font-size:9px;color:var(--muted);word-break:break-all">Short: ${v.short_url || ''}</div><div style="font-size:9px;color:#a99cff;word-break:break-all;margin-top:3px">Share: ${v.share_link || (v.share_code ? `https://t.me/${window.RUNTIME_BOT_USERNAME || BOT_USERNAME}?startapp=${v.share_code}` : '')}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);background:var(--surface-2);padding:6px 10px;border-radius:8px">
+            <span>👁 ${vCount} views</span>
+            <span>🔓 ${uCount} unlocked</span>
+            <span>❤️ ${rCount} likes</span>
+            <span>💬 ${cCount} comments</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-g" style="width:auto;padding:5px 9px;font-size:10px" onclick="fallbackCopyShareLink('${v.share_link || (v.share_code ? `https://t.me/${window.RUNTIME_BOT_USERNAME || BOT_USERNAME}?startapp=${v.share_code}` : '')}')">Copy Share Link</button>
+            <button class="btn btn-p" style="width:auto;padding:5px 9px;font-size:10px" onclick="fallbackCopyShareLink('${v.short_url || ''}')">Copy Short Link</button><button class="btn btn-g" style="width:auto;padding:5px 9px;font-size:10px" onclick="rebroadcastVideo('${v.id}')">📢 Re-Broadcast</button>
+          </div>
+        </div>
+      `;
+    }).join('') : '<div class="empty-state">কোনো ভিডিও নেই</div>';
+  }
+
+  const catListCont = document.getElementById('admin-cat-list');
+  if (catListCont) {
+    catListCont.innerHTML = state.categories.filter(c => c.id !== 'cat_all').map(c => `
+      <div class="admin-list-item">
+        <div style="font-size:12px;font-weight:600">${c.icon} ${c.name}</div>
+      </div>
+    `).join('');
+  }
+
+  const viralListCont = document.getElementById('admin-viral-list');
+  if (viralListCont) {
+    const links = state.viralLinks || [];
+    viralListCont.innerHTML = links.length ? links.map(l => `
+      <div class="admin-list-item">
+        <div class="admin-list-info">
+          <div style="font-size:16px">🔥</div>
+          <div>
+            <div style="font-size:12px;font-weight:600;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.title}</div>
+            <div style="font-size:10px;color:var(--muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.url}</div>
+          </div>
+        </div>
+        <button class="btn btn-d" style="width:auto;padding:6px 12px;font-size:11px" onclick="deleteViralLink('${l.id}')">ডিলিট</button>
+      </div>
+    `).join('') : '<div class="empty-state">কোনো লিংক যুক্ত নেই</div>';
+  }
+}
+
+async function loadAdminSettings() {
+  const data=state.appSettings||{};
+  const map={'set-brand':data.brand_name,'set-brand-subtitle':data.brand_subtitle,'set-hero-text':data.hero_text,'set-nav-home':data.nav_home,'set-nav-fav':data.nav_fav,'set-nav-unlock':data.nav_unlock,'set-nav-viral':data.nav_viral,'set-nav-profile':data.nav_profile,'set-online-label':data.online_label,'set-webapp-url':data.web_app_url,'set-menu-button-text':data.bot_menu_button_text,'set-welcome-text':data.welcome_text,'set-watch-text':data.watch_button_text,'set-broadcast-text':data.broadcast_button_text,'set-delete-min':data.auto_delete_minutes,'set-tutorial-code':data.tutorial_video_code,'set-tutorial-caption':data.tutorial_caption,'set-tutorial-button':data.tutorial_button_text,'set-storage-channel':data.storage_channel_id,'set-maintenance-message':data.maintenance_message,'set-support-url':data.support_url,'set-join-channel-url':data.join_channel_url,'set-adsgram-block-id':data.adsgram_block_id,'set-required-ads-default':data.required_ads_default,'set-ad-button-text':data.ad_button_text,'set-ad-unlock-text':data.ad_unlock_text,'set-monetization-mode':data.monetization_mode,'set-monetag-zone-id':data.monetag_zone_id,'set-monetag-required-default':data.monetag_required_default,'set-monetag-button-text':data.monetag_button_text,'set-monetag-wait-seconds':data.monetag_wait_seconds,'set-join-welcome-text':data.join_welcome_text,'set-leave-inbox-text':data.leave_inbox_text,'set-welcome-video-button-text':data.welcome_video_button_text,'set-welcome-video-button-url':data.welcome_video_button_url,'set-welcome-start-button-text':data.welcome_start_button_text,'set-welcome-start-button-url':data.welcome_start_button_url,'set-welcome-rejoin-button-text':data.welcome_rejoin_button_text,'set-welcome-rejoin-button-url':data.welcome_rejoin_button_url};
+  Object.entries(map).forEach(([id,val])=>{const el=document.getElementById(id);if(el&&val!==undefined&&val!==null)el.value=val;});
+  const p=document.getElementById('set-protect');if(p)p.checked=data.protect_content!==false;
+  const m=document.getElementById('set-maintenance');if(m)m.checked=!!data.maintenance_mode;
+  const so=document.getElementById('set-show-online');if(so)so.checked=data.show_online!==false;const wm=document.getElementById('set-welcome-manager-enabled');if(wm)wm.checked=data.welcome_manager_enabled!==false;const jrw=document.getElementById('set-join-request-welcome-enabled');if(jrw)jrw.checked=data.join_request_welcome_enabled!==false;const djw=document.getElementById('set-direct-join-welcome-enabled');if(djw)djw.checked=data.direct_join_welcome_enabled!==false;const lie=document.getElementById('set-leave-inbox-enabled');if(lie)lie.checked=data.leave_inbox_enabled!==false;const aar=document.getElementById('set-auto-approve-join-requests');if(aar)aar.checked=!!data.auto_approve_join_requests;const wvbe=document.getElementById('set-welcome-video-button-enabled');if(wvbe)wvbe.checked=data.welcome_video_button_enabled!==false;const wsbe=document.getElementById('set-welcome-start-button-enabled');if(wsbe)wsbe.checked=data.welcome_start_button_enabled!==false;const wrbe=document.getElementById('set-welcome-rejoin-button-enabled');if(wrbe)wrbe.checked=data.welcome_rejoin_button_enabled!==false;const ae=document.getElementById('set-adsgram-enabled');if(ae)ae.checked=data.adsgram_enabled!==false;const me=document.getElementById('set-monetag-enabled');if(me)me.checked=data.monetag_enabled!==false;const te=document.getElementById('set-tutorial-enabled');if(te)te.checked=data.tutorial_enabled!==false;['comments','reactions','favorites','profile-stats'].forEach(k=>{const el=document.getElementById('set-'+k+'-enabled');if(el)el.checked=data[k.replace('-', '_')+'_enabled']!==false;});applyAppSettings();
+}
+let settingsSaveInFlight = false;
+async function saveAdminSettings() {
+  if(settingsSaveInFlight) return;
+  const gv=id=>document.getElementById(id)?.value?.trim();
+  const data={brand_name:gv('set-brand')||'Bangladesh Viral Video',brand_subtitle:gv('set-brand-subtitle')||'PREMIUM VIDEO HUB',hero_text:gv('set-hero-text')||'ফোনের গ্যালারির মতো সহজে ভিডিও বাছাই করুন, Ad/Task সম্পন্ন করে নিরাপদে আনলক করুন।',nav_home:gv('set-nav-home')||'হোম',nav_fav:gv('set-nav-fav')||'পছন্দ',nav_unlock:gv('set-nav-unlock')||'আনলক',nav_viral:gv('set-nav-viral')||'ভাইরাল লিংক',nav_profile:gv('set-nav-profile')||'প্রোফাইল',online_label:gv('set-online-label')||'Online',show_online:document.getElementById('set-show-online')?.checked!==false,web_app_url:gv('set-webapp-url')||null,bot_menu_button_text:gv('set-menu-button-text')||'🎬 Video open',welcome_text:gv('set-welcome-text')||'👋 স্বাগতম! নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',watch_button_text:gv('set-watch-text')||'Watch Video',broadcast_button_text:gv('set-broadcast-text')||'▶ ভিডিও ওপেন করুন',auto_delete_minutes:parseInt(gv('set-delete-min'))||20,protect_content:document.getElementById('set-protect').checked,maintenance_mode:document.getElementById('set-maintenance').checked,tutorial_enabled:document.getElementById('set-tutorial-enabled')?.checked!==false,tutorial_video_code:gv('set-tutorial-code')||null,tutorial_caption:gv('set-tutorial-caption')||'🎓 ভিডিও কীভাবে দেখবেন\n\nএই ছোট ভিডিওটি দেখে নিন। তারপর নিচের বাটন থেকে ভিডিও অ্যাপ খুলে আপনার পছন্দের ভিডিও দেখুন।',tutorial_button_text:gv('set-tutorial-button')||'🎬 ভিডিও দেখতে শুরু করুন',storage_channel_id:parseInt(gv('set-storage-channel'))||null,maintenance_message:gv('set-maintenance-message')||'⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।',support_url:gv('set-support-url')||null,join_channel_url:gv('set-join-channel-url')||null,start_button_text:'🎬 ভিডিও দেখতে শুরু করুন',comments_enabled:document.getElementById('set-comments-enabled')?.checked!==false,reactions_enabled:document.getElementById('set-reactions-enabled')?.checked!==false,favorites_enabled:document.getElementById('set-favorites-enabled')?.checked!==false,profile_stats_enabled:document.getElementById('set-profile-stats-enabled')?.checked!==false,adsgram_enabled:document.getElementById('set-adsgram-enabled')?.checked!==false,adsgram_block_id:gv('set-adsgram-block-id')||'int-45179',required_ads_default:parseInt(gv('set-required-ads-default'))||1,ad_button_text:gv('set-ad-button-text')||'📢 Ad দেখুন',ad_unlock_text:gv('set-ad-unlock-text')||'🔓 ভিডিও আনলক করুন',monetization_mode:gv('set-monetization-mode')||'both',monetag_enabled:document.getElementById('set-monetag-enabled')?.checked!==false,monetag_zone_id:gv('set-monetag-zone-id')||'11404425',monetag_required_default:parseInt(gv('set-monetag-required-default'))||1,monetag_button_text:gv('set-monetag-button-text')||'💰 Monetag Ad দেখুন',monetag_wait_seconds:0,welcome_manager_enabled:document.getElementById('set-welcome-manager-enabled')?.checked!==false,join_request_welcome_enabled:document.getElementById('set-join-request-welcome-enabled')?.checked!==false,direct_join_welcome_enabled:document.getElementById('set-direct-join-welcome-enabled')?.checked!==false,leave_inbox_enabled:document.getElementById('set-leave-inbox-enabled')?.checked!==false,auto_approve_join_requests:!!document.getElementById('set-auto-approve-join-requests')?.checked,join_welcome_text:gv('set-join-welcome-text')||'👋 স্বাগতম! আমাদের ভিডিও কমিউনিটিতে আপনাকে স্বাগতম। নিচের বাটন থেকে ভিডিও অ্যাপ খুলুন।',leave_inbox_text:gv('set-leave-inbox-text')||'😢 আপনি আমাদের গ্রুপ/চ্যানেল থেকে বের হয়ে গেছেন। নতুন ভিডিও মিস না করতে আবার যুক্ত হতে পারেন।',welcome_video_button_text:gv('set-welcome-video-button-text')||'🎬 ভিডিও ওপেন করুন',welcome_video_button_url:gv('set-welcome-video-button-url')||null,welcome_video_button_enabled:document.getElementById('set-welcome-video-button-enabled')?.checked!==false,welcome_start_button_text:gv('set-welcome-start-button-text')||'🚀 Start Bot',welcome_start_button_url:gv('set-welcome-start-button-url')||null,welcome_start_button_enabled:document.getElementById('set-welcome-start-button-enabled')?.checked!==false,welcome_rejoin_button_text:gv('set-welcome-rejoin-button-text')||'🔄 আবার Join করুন',welcome_rejoin_button_url:gv('set-welcome-rejoin-button-url')||null,welcome_rejoin_button_enabled:document.getElementById('set-welcome-rejoin-button-enabled')?.checked!==false};
+  const btn=document.getElementById('settings-save-btn');
+  settingsSaveInFlight=true;
+  if(btn){btn.disabled=true;btn.textContent='⏳ সেভ হচ্ছে...';}
+  try{
+    const res=await apiFetch('/api/admin/settings',{method:'POST',body:JSON.stringify(data)});
+    state.appSettings={...state.appSettings,...(res.settings||data)};
+    applyAppSettings();
+    showToast('সেটিংস সেভ হয়েছে ✅','success');
+  }catch(e){
+    console.error('settings save failed',e);
+    showToast('সেটিংস সেভ হয়নি: '+(e.message||'Unknown error'),'danger');
+  }finally{
+    settingsSaveInFlight=false;
+    if(btn){btn.disabled=false;btn.textContent='সেটিংস সেভ করুন';}
+  }
+}
+
+async function sendDirectBroadcast(){
+  const body={message_type:document.getElementById('bc-type').value,text:document.getElementById('bc-text').value.trim(),media_url:document.getElementById('bc-media').value.trim(),button_text:document.getElementById('bc-button-text').value.trim(),button_url:document.getElementById('bc-button-url').value.trim()};
+  if(!body.text&&!body.media_url)return showToast('Message বা Media দিন','danger');
+  if(!confirm('সব active user-এর কাছে এখনই পাঠাবেন?'))return;
+  try{const r=await apiFetch('/api/admin/broadcast',{method:'POST',body:JSON.stringify(body)});document.getElementById('bc-result').textContent=`✅ Sent: ${r.sent} | ❌ Failed: ${r.failed}`;showToast('Broadcast complete ✅','success');}catch(e){showToast('Broadcast failed','danger');}
+}
+async function loadAdminUsers(){
+  try{const d=await apiFetch('/api/admin/users');const c=document.getElementById('admin-user-list');c.innerHTML=(d.users||[]).map(u=>`<div class="admin-list-item" style="flex-direction:column;align-items:stretch;gap:7px"><div style="display:flex;justify-content:space-between;gap:10px"><div><b>${u.first_name||'User'}</b><div style="font-size:10px;color:var(--muted)">@${u.username||'-'} · ${u.user_id}<br>${u.is_active?'🟢 Mini Bot Active':'🔴 Mini Bot Inactive'} · ${u.notification_bot_started?'📢 Notify Bot Started':'⚪ Notify Bot Not Started'} · ${u.video_bot_started?'🎥 Video Bot Started':'⚪ Video Bot Not Started'}</div></div><button class="btn btn-g" style="width:auto;padding:6px 10px" onclick="toggleBotUser('${u.user_id}',${!u.is_active})">${u.is_active?'Disable':'Enable'}</button></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:9px"><span>👁 ${u.opened_total||0}</span><span>🔓 ${u.unlocked||0}</span><span>📢 ${u.ads_completed||0}</span><span>🎬 ${u.opened_unique||0}</span></div>${u.last_unlock_at?`<div style="font-size:9px;color:var(--muted)">Last unlock: ${u.last_unlock_at}</div>`:''}</div>`).join('')||'<div class="empty-state">No users</div>';}catch(e){showToast('Users load failed','danger');}
+}
+async function toggleBotUser(id,active){try{await apiFetch('/api/admin/users/'+id+'/toggle',{method:'POST',body:JSON.stringify({is_active:active})});loadAdminUsers();}catch(e){showToast('Update failed','danger');}}
+async function loadAdmins(){
+  if(!(serverIsOwner||adminPermissions.can_manage_admins))return;
+  try{const d=await apiFetch('/api/admin/admins');const c=document.getElementById('admin-admin-list');c.innerHTML=`<div class="admin-list-item"><div><b>👑 Owner</b><div style="font-size:10px;color:var(--muted)">${d.owner_id} · Full Access</div></div></div>`+(d.admins||[]).map(a=>`<div class="admin-list-item"><div><b>${a.display_name||'Admin'}</b><div style="font-size:10px;color:var(--muted)">${a.user_id} · ${a.role}</div></div><button class="btn btn-d" style="width:auto;padding:6px 10px" onclick="removeAdmin('${a.user_id}')">Remove</button></div>`).join('');}catch(e){showToast('Admin list load failed','danger');}
+}
+async function saveAdminUser(){
+  const id=parseInt(document.getElementById('new-admin-id').value);if(!id)return showToast('User ID দিন','danger');
+  const body={user_id:id,display_name:document.getElementById('new-admin-name').value.trim()||'Admin',role:'admin',can_manage_content:document.getElementById('perm-content').checked,can_manage_settings:document.getElementById('perm-settings').checked,can_broadcast:document.getElementById('perm-broadcast').checked,can_manage_users:document.getElementById('perm-users').checked,can_manage_admins:document.getElementById('perm-admins').checked,can_manage_packages:document.getElementById('perm-packages').checked,can_manage_withdraw:document.getElementById('perm-withdraw').checked,can_manage_support:document.getElementById('perm-support').checked,can_manage_tasks:document.getElementById('perm-tasks').checked,can_manage_notifications:document.getElementById('perm-notify').checked,can_view_analytics:document.getElementById('perm-analytics').checked};
+  try{await apiFetch('/api/admin/admins',{method:'POST',body:JSON.stringify(body)});showToast('Admin saved ✅','success');loadAdmins();}catch(e){showToast('Admin save failed','danger');}
+}
+async function removeAdmin(id){if(!confirm('Admin remove করবেন?'))return;try{await apiFetch('/api/admin/admins/'+id,{method:'DELETE'});loadAdmins();}catch(e){showToast('Remove failed','danger');}}
+
+
+async function loadBotControl(){
+  try{
+    const d=await apiFetch('/api/admin/bot-status');
+    const roles=[['mini','📱 Mini Bot','Mini App + Central Control'],['notification','📢 Notification Bot','Package + Broadcast + Join/Leave'],['video','🎥 Video Bot','Protected Video Delivery']];
+    const c=document.getElementById('bot-role-list');
+    c.innerHTML=roles.map(([k,name,sub])=>{const x=d[k]||{};return `<div class="bot-role-card"><div class="bot-role-top"><div><div class="bot-role-name">${name}</div><div class="bot-role-sub">${sub}</div></div><span class="bot-status-dot ${x.ok?'ok':''}"></span></div><div style="font-size:10px;color:var(--muted);margin-top:9px">${x.ok?`@${escapeHtml(x.username||'-')} · ID ${x.id}`:`❌ ${escapeHtml(x.error||'Offline')}`}</div></div>`}).join('');
+  }catch(e){showToast('Bot status load হয়নি: '+(e.message||''),'danger');}
+}
+async function testBotRole(target){
+  try{await apiFetch('/api/admin/bot-test',{method:'POST',body:JSON.stringify({target})});showToast(target+' Bot test sent ✅','success');}
+  catch(e){showToast('Test failed: '+(e.message||''),'danger');}
+}
+
+function clearManagedChatForm(){
+  ['jl-chat-id','jl-chat-title','jl-join-url'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const t=document.getElementById('jl-chat-type');if(t)t.value='group';
+  ['jl-enabled','jl-join-request','jl-direct-join','jl-leave'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=true;});
+  const a=document.getElementById('jl-auto-approve');if(a)a.checked=false;
+}
+let managedChatCache={};
+async function loadManagedChats(){
+  try{
+    const [d,st]=await Promise.all([apiFetch('/api/admin/managed-chats'),apiFetch('/api/admin/join-leave-stats')]);
+    const c=document.getElementById('managed-chat-list');
+    managedChatCache={};(d.chats||[]).forEach(x=>managedChatCache[String(x.chat_id)]=x);
+    c.innerHTML=(d.chats||[]).map(x=>`<div class="admin-list-item" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>${escapeHtml(x.title||String(x.chat_id))}</b><div style="font-size:10px;color:var(--muted);line-height:1.55">${x.chat_type||'chat'} · ${x.chat_id}<br>${x.enabled?'🟢 Enabled':'🔴 Disabled'} · JoinReq ${x.join_request_welcome?'ON':'OFF'} · Join ${x.direct_join_welcome?'ON':'OFF'} · Leave ${x.leave_welcome?'ON':'OFF'}${x.join_url?'<br>'+escapeHtml(x.join_url):''}</div></div><div style="display:grid;gap:6px"><button class="btn btn-g" style="width:auto;padding:7px 10px" onclick="editManagedChatById('${x.chat_id}')">✏️ Edit</button><button class="btn btn-d" style="width:auto;padding:7px 10px" onclick="deleteManagedChat('${x.chat_id}')">🗑</button></div></div>`).join('')||'<div class="empty-state">এখনও কোনো managed chat নেই। Bot-কে group/channel Admin করলে auto detect হবে।</div>';
+    ['joins','sent','leaves','total'].forEach(k=>{const e=document.getElementById('jl-stat-'+k);if(e)e.textContent=Number(st[k]||0)});
+  }catch(e){showToast('Managed chats load failed: '+(e.message||''),'danger');}
+}
+function editManagedChatById(id){
+  const x=managedChatCache[String(id)];if(!x)return;
+  document.getElementById('jl-chat-id').value=x.chat_id||'';document.getElementById('jl-chat-title').value=x.title||'';document.getElementById('jl-chat-type').value=x.chat_type||'group';document.getElementById('jl-join-url').value=x.join_url||'';document.getElementById('jl-enabled').checked=x.enabled!==false;document.getElementById('jl-join-request').checked=x.join_request_welcome!==false;document.getElementById('jl-direct-join').checked=x.direct_join_welcome!==false;document.getElementById('jl-leave').checked=x.leave_welcome!==false;document.getElementById('jl-auto-approve').checked=!!x.auto_approve;window.scrollTo({top:0,behavior:'smooth'});
+}
+async function saveManagedChat(){
+  const id=parseInt(document.getElementById('jl-chat-id').value);if(!id)return showToast('Chat ID দিন','danger');
+  const body={chat_id:id,title:document.getElementById('jl-chat-title').value.trim()||String(id),chat_type:document.getElementById('jl-chat-type').value,join_url:document.getElementById('jl-join-url').value.trim()||null,enabled:document.getElementById('jl-enabled').checked,join_request_welcome:document.getElementById('jl-join-request').checked,direct_join_welcome:document.getElementById('jl-direct-join').checked,leave_welcome:document.getElementById('jl-leave').checked,auto_approve:document.getElementById('jl-auto-approve').checked};
+  try{await apiFetch('/api/admin/managed-chats',{method:'POST',body:JSON.stringify(body)});showToast('Chat settings saved ✅','success');loadManagedChats();}catch(e){showToast('Chat save failed: '+(e.message||''),'danger');}
+}
+async function deleteManagedChat(id){if(!confirm('এই chat Welcome Manager থেকে remove করবেন?'))return;try{await apiFetch('/api/admin/managed-chats/'+encodeURIComponent(id),{method:'DELETE'});loadManagedChats();}catch(e){showToast('Remove failed','danger')}}
+
+function switchAdminSubView(id, btn) {
+  document.querySelectorAll('.admin-subview').forEach(v => v.classList.add('hidden'));
+  const subview = document.getElementById('admin-' + id);
+  if(subview) subview.classList.remove('hidden');
+  if(id==='bots') loadBotControl();
+  if(id==='vids') loadAutoDrafts();
+  if(id==='users') loadAdminUsers();
+  if(id==='admins') loadAdmins();
+  if(id==='joinleave') loadManagedChats();
+  
+  if(btn && btn.parentElement) {
+    const tabs = btn.parentElement.querySelectorAll('.tab');
+    tabs.forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const targetView = document.getElementById('view-' + viewId);
+  if(targetView) targetView.classList.add('active');
+  
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(n => n.classList.remove('active'));
+  
+  const viewIndexMap = { 'home': 0, 'fav': 1, 'unlock': 2, 'viral': 3, 'profile': 4, 'admin': 5 };
+  if (viewIndexMap[viewId] !== undefined && navItems[viewIndexMap[viewId]]) navItems[viewIndexMap[viewId]].classList.add('active');
+  if(viewId==='profile') updateProfileStats();
+}
+
+function switchCat(id) {
+  currentCat = id;
+  renderCategories();
+  renderHome();
+}
+
+function handleSearch() {
+  const searchInput = document.getElementById('main-search');
+  const q = searchInput ? searchInput.value.toLowerCase() : '';
+  const grid = document.getElementById('main-grid');
+  if(!grid) return;
+  let vids = state.videos;
+  if (currentCat !== 'cat_all') {
+    vids = vids.filter(v => (v.category_id === currentCat || v.categoryId === currentCat));
+  }
+  const filtered = vids.filter(v => v.title.toLowerCase().includes(q));
+  grid.innerHTML = filtered.map(createVideoCard).join('');
+}
+
+async function toggleFav(id) {
+  try{
+    const r=await apiFetch('/api/videos/'+encodeURIComponent(id)+'/favorite',{method:'POST',body:'{}'});
+    state.favorites[id]=!!r.active; renderAll(); updateProfileStats();
+  }catch(e){showToast('পছন্দ সেভ করা যায়নি','warning');}
+}
+
+function showToast(msg, type = 'info') {
+  const cont = document.getElementById('toast-container');
+  if(!cont) return;
+  const toast = document.createElement('div');
+  toast.className = `toast`;
+  toast.innerHTML = `<span>${type === 'success' ? '✅' : 'ℹ️'}</span> ${msg}`;
+  cont.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function updateUserUI() {
+  const firstName = user.first_name || 'Guest';
+  const lastName = user.last_name || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+  const username = user.username ? `@${user.username}` : '@user';
+  const userId = user.id || '000000';
+  const photoUrl = user.photo_url || '';
+
+  // Header Avatar & Name
+  const uNameEl = document.getElementById('u-name');
+  if(uNameEl) uNameEl.textContent = firstName;
+
+  const uAvatarEl = document.getElementById('u-avatar');
+  if(uAvatarEl) {
+    if(photoUrl) {
+      uAvatarEl.innerHTML = `<img src="${photoUrl}" alt="Avatar">`;
+    } else {
+      uAvatarEl.textContent = firstName.charAt(0).toUpperCase();
+    }
+  }
+
+  // Profile View Elements
+  const profNameEl = document.getElementById('prof-name');
+  if(profNameEl) profNameEl.textContent = fullName;
+
+  const profUsernameEl = document.getElementById('prof-username');
+  if(profUsernameEl) profUsernameEl.textContent = username;
+
+  const profIdEl = document.getElementById('prof-id');
+  if(profIdEl) profIdEl.textContent = `ID: ${userId}`;
+
+  const profAvatarBox = document.getElementById('prof-avatar-box');
+  if(profAvatarBox) {
+    if(photoUrl) {
+      profAvatarBox.innerHTML = `<img src="${photoUrl}" alt="Profile Picture">`;
+    } else {
+      profAvatarBox.innerHTML = `<span id="prof-default-letter">${firstName.charAt(0).toUpperCase()}</span>`;
+    }
+  }
+}
+
+async function updateProfileStats(){
+  if(!user?.id)return;
+  try{
+    const p=await apiFetch('/api/profile');
+    const map={'prof-opened':p.opened_total,'prof-unlocked':p.unlocked,'prof-favorites':p.favorites,'prof-reactions':p.reactions,'prof-comments':p.comments,'prof-ad-tasks':p.ad_tasks,'prof-unique':p.opened_unique};
+    Object.entries(map).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=Number(v||0)});const jd=document.getElementById('prof-join-date');if(jd&&p.join_date)jd.textContent=new Date(p.join_date).toLocaleDateString();
+    const r=document.getElementById('prof-recent'); if(r) r.innerHTML=(p.recent_unlocked||[]).length?(p.recent_unlocked||[]).map(v=>`<div class="v8-recent-item"><img src="${v.thumb||''}"><div><b>${escapeHtml(v.title)}</b><span>🔓 আনলক করা</span></div></div>`).join(''):'<div class="empty-state" style="padding:14px">এখনো কোনো ভিডিও আনলক করা হয়নি</div>';
+  }catch(e){console.warn('profile stats failed',e);}
+}
+
+function updateStats() {
+  const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  setEl('stat-total-v', state.videos.length);
+  setEl('stat-unlocked-v', Object.keys(state.unlocked).length);
+  setEl('stat-fav-v', Object.keys(state.favorites).filter(k => state.favorites[k]).length);
+  setEl('video-count-label', `${state.videos.length} videos • Latest`);
+  applyAppSettings();
+}
+
+function previewFile(input, targetId) {
+  const file = input.files[0];
+  const target = document.getElementById(targetId);
+  if (file && target) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      target._data = e.target.result;
+      renderThumbPreview();
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if(modal) modal.classList.remove('open');
+  const mediaCont = document.getElementById('md-media-container');
+  if(mediaCont) mediaCont.innerHTML = '';
+}
+
+function scrollToComments() {
+  const anchor = document.getElementById('comments-section-anchor');
+  if(anchor) anchor.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function renderComments(vidId) {
+  const cont = document.getElementById('md-comments'); const countEl=document.getElementById('md-comment-count');
+  if(!cont) return;
+  try{
+    const r=await apiFetch('/api/videos/'+encodeURIComponent(vidId)+'/comments');
+    const list=r.comments||[]; if(countEl) countEl.textContent=list.length;
+    if(currentActiveVid) currentActiveVid.comment_count=list.length;
+    cont.innerHTML=list.length?list.map(c=>`<div class="comment-item"><div class="comment-user-row"><div class="comment-avatar">${escapeHtml((c.display_name||'U').charAt(0))}</div><div class="comment-info"><div class="comment-author">${escapeHtml(c.display_name||'User')}</div><div class="comment-time">${new Date(c.created_at).toLocaleString()}</div></div></div><div class="comment-text">${escapeHtml(c.text)}</div></div>`).join(''):'<div class="empty-state" style="padding:20px">এখনো কোনো কমেন্ট নেই — প্রথম কমেন্টটি করুন</div>';
+  }catch(e){cont.innerHTML='<div class="empty-state">কমেন্ট লোড করা যায়নি</div>';}
+}
+
+async function postComment() {
+  const input=document.getElementById('md-comment-input');
+  if(!input||!input.value.trim()||!currentActiveVid)return;
+  try{await apiFetch('/api/videos/'+encodeURIComponent(currentActiveVid.id)+'/comments',{method:'POST',body:JSON.stringify({text:input.value.trim()})});input.value='';await renderComments(currentActiveVid.id);renderHome();updateProfileStats();}
+  catch(e){showToast('কমেন্ট পোস্ট হয়নি','warning');}
+}
+
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'backup.json';
+  a.click();
+}
+
+function clearAppData() {
+  if (confirm("Clear everything?")) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+window.onload = initApp;
+</script>
+
+<script>
+let v20AdminConfig=null;
+function v20Money(v){return '৳'+Number(v||0).toFixed(2)}
+async function loadV20Profile(){if(!user?.id)return;try{const [w,t]=await Promise.all([apiFetch('/api/v20/wallet'),apiFetch('/api/v20/tasks')]);[['v20-balance',v20Money(w.balance)],['v20-watched',w.total_video_watched],['v20-unlocks',w.total_video_unlock],['v20-earned',v20Money(w.total_earn)],['v20-withdrawn',v20Money(w.total_withdraw)]].forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.textContent=v});const hb=document.getElementById('home-v20-balance');if(hb)hb.textContent=v20Money(w.balance);const hw=document.getElementById('home-v20-watch');if(hw)hw.textContent=w.total_video_watched||0;const hu=document.getElementById('home-v20-user');if(hu)hu.textContent=user.username?'@'+user.username:String(user.first_name||'User');const h=document.getElementById('v20-withdraw-history');if(h)h.innerHTML=(w.withdraw_history||[]).map(x=>`<div class="v20-list-item">${v20Money(x.amount)} · ${escapeHtml(x.payment_method)} · ${escapeHtml(x.account_number)}<br><small>${escapeHtml(x.status)}</small></div>`).join('')||'<div class="empty-state">No withdraw history</div>';const tl=document.getElementById('v20-user-tasks');if(tl)tl.innerHTML=(t.tasks||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title)}</b><div>${x.task_type} · Reward ${v20Money(x.reward_amount)}</div>${x.completed?'✅ Completed':`<button class="btn btn-p" style="margin-top:8px" onclick="completeV20Task(${x.id},'${String(x.task_link||'').replace(/'/g,"\\'")}')">Complete Task</button>`}</div>`).join('')||'<div class="empty-state">No active task</div>';}catch(e){console.warn(e)}}
+async function submitV20Withdraw(){try{await apiFetch('/api/v20/withdraw',{method:'POST',body:JSON.stringify({amount:Number(document.getElementById('v20-wd-amount').value),payment_method:document.getElementById('v20-wd-method').value,number:document.getElementById('v20-wd-number').value.trim()})});showToast('Withdraw request submitted ✅','success');loadV20Profile()}catch(e){showToast(e.message||'Withdraw failed','danger')}}
+async function completeV20Task(id,url){if(url)Telegram?.WebApp?.openLink?Telegram.WebApp.openLink(url):window.open(url,'_blank');try{const r=await apiFetch('/api/v20/tasks/'+id+'/complete',{method:'POST',body:'{}'});showToast(`Task completed +${v20Money(r.reward||0)} ✅`,'success');loadV20Profile()}catch(e){showToast(e.message||'Task failed','danger')}}
+async function loadV20Admin(){if(!serverIsAdmin)return;try{const d=await apiFetch('/api/v20/admin/config');v20AdminConfig=d;const t=d.tutorial||{},w=d.wallet||{},b=d.buttons||{},a=d.ads||{},x=d.texts||{};const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v??''},check=(id,v)=>{const e=document.getElementById(id);if(e)e.checked=!!v};set('v20-vmsg',b.custom_message);set('v20-b1n',b.button1_name);set('v20-b1u',b.button1_url);check('v20-b1e',b.button1_enabled);set('v20-b2n',b.button2_name);set('v20-b2u',b.button2_url);check('v20-b2e',b.button2_enabled);set('v20-dmsg',b.deleted_message);set('v20-db1n',b.deleted_button1_name);set('v20-db1u',b.deleted_button1_url);check('v20-db1e',b.deleted_button1_enabled);set('v20-db2n',b.deleted_button2_name);set('v20-db2u',b.deleted_button2_url);check('v20-db2e',b.deleted_button2_enabled);check('v20-t-enabled',t.enabled);set('v20-t-code',t.video_code);set('v20-t-title',t.title);set('v20-t-desc',t.description);set('v20-t-btn',t.button_text);set('v20-w-reward',w.per_video_reward);set('v20-w-daily',w.daily_reward_limit);set('v20-w-min',w.minimum_withdraw);set('v20-w-max',w.maximum_withdraw);check('v20-w-enabled',w.withdraw_enabled);set('v20-w-methods',w.payment_methods);set('v20-ad-mode',a.mode||'both');check('v20-ag-enabled',a.adsgram_enabled);set('v20-ag-block',a.adsgram_block_id);set('v20-ag-required',a.adsgram_required);check('v20-ag-reward',a.adsgram_reward_mode);check('v20-mo-enabled',a.monetag_enabled);set('v20-mo-zone',a.monetag_zone_id);set('v20-mo-link',a.monetag_smart_link);set('v20-mo-script',a.monetag_script_api);set('v20-mo-wait',0);set('v20-txt-access-title',x.video_access_title);set('v20-txt-access-instruction',x.video_access_instruction);set('v20-txt-seen',x.ad_progress_seen_text);set('v20-txt-remaining',x.ad_progress_remaining_text);set('v20-txt-ad-button',x.ad_watch_button_text);set('v20-txt-done',x.all_ads_done_text);set('v20-txt-watch',x.watch_video_button_text);set('v20-txt-secure',x.video_access_secure_text);set('v20-txt-mb-msg',x.mini_bot_package_message);set('v20-txt-mb-btn',x.mini_bot_package_button_text);set('v20-txt-vb-msg',x.video_bot_package_message);set('v20-txt-vb-btn',x.video_bot_package_button_text);set('v20-txt-nb-msg',x.notification_bot_package_message);set('v20-txt-nb-btn',x.notification_bot_package_button_text);set('v20-txt-ch-msg',x.channel_package_message);set('v20-txt-ch-btn',x.channel_package_button_text);renderV20AdminLists(d);const tt=document.getElementById('v20-tutorial-tab');if(tt&&!d.is_owner)tt.style.display='none';const lt=document.getElementById('legacy-tutorial-card');if(lt&&!d.is_owner)lt.style.display='none';}catch(e){console.warn('v20 admin load',e)}}
+function renderV20AdminLists(d){const tl=document.getElementById('v20-task-list');if(tl)tl.innerHTML=(d.tasks||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title)}</b> · ${x.task_type} · ${v20Money(x.reward_amount)} <button onclick="deleteV20Task(${x.id})">🗑</button></div>`).join('');const cl=document.getElementById('v20-channel-list');if(cl)cl.innerHTML=(d.channels||[]).map(x=>`<div class="v20-list-item"><b>${escapeHtml(x.title||String(x.chat_id))}</b><br><small>${x.chat_id}</small> <button onclick="deleteV20Channel(${x.id})">🗑</button></div>`).join('');const wl=document.getElementById('v20-withdraw-list');if(wl)wl.innerHTML=(d.withdraws||[]).map(x=>`<div class="v20-list-item"><b>User ${x.user_id}</b> · ${v20Money(x.amount)}<br>${escapeHtml(x.payment_method)} · ${escapeHtml(x.account_number)} · ${escapeHtml(x.status)}${x.status==='pending'?`<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-p" onclick="reviewV20Withdraw(${x.id},'approved')">Approve</button><button class="btn btn-d" onclick="reviewV20Withdraw(${x.id},'rejected')">Reject</button></div>`:''}</div>`).join('')||'<div class="empty-state">No requests</div>'}
+async function saveV20Section(section,data){try{await apiFetch('/api/v20/admin/config',{method:'POST',body:JSON.stringify({section,...data})});showToast('Saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Save failed','danger')}}
+function saveV20Buttons(){saveV20Section('buttons',{custom_message:v20('v20-vmsg'),button1_name:v20('v20-b1n'),button1_url:v20('v20-b1u'),button1_enabled:v20c('v20-b1e'),button2_name:v20('v20-b2n'),button2_url:v20('v20-b2u'),button2_enabled:v20c('v20-b2e'),deleted_message:v20('v20-dmsg'),deleted_button1_name:v20('v20-db1n'),deleted_button1_url:v20('v20-db1u'),deleted_button1_enabled:v20c('v20-db1e'),deleted_button2_name:v20('v20-db2n'),deleted_button2_url:v20('v20-db2u'),deleted_button2_enabled:v20c('v20-db2e')})}
+function saveV20Tutorial(){saveV20Section('tutorial',{enabled:v20c('v20-t-enabled'),video_code:v20('v20-t-code'),title:v20('v20-t-title'),description:v20('v20-t-desc'),button_text:v20('v20-t-btn')})}
+function deleteV20Tutorial(){if(!confirm('Tutorial video delete করবেন?'))return;saveV20Section('tutorial',{enabled:false,video_code:null,title:v20('v20-t-title'),description:v20('v20-t-desc'),button_text:v20('v20-t-btn')})}
+function saveV20WalletSettings(){saveV20Section('wallet',{per_video_reward:Number(v20('v20-w-reward')),daily_reward_limit:Number(v20('v20-w-daily')),minimum_withdraw:Number(v20('v20-w-min')),maximum_withdraw:Number(v20('v20-w-max')),withdraw_enabled:v20c('v20-w-enabled'),payment_methods:v20('v20-w-methods')})}
+function saveV20Ads(){saveV20Section('ads',{mode:v20('v20-ad-mode'),adsgram_enabled:v20c('v20-ag-enabled'),adsgram_block_id:v20('v20-ag-block'),adsgram_required:Number(v20('v20-ag-required')),adsgram_reward_mode:v20c('v20-ag-reward'),monetag_enabled:v20c('v20-mo-enabled'),monetag_zone_id:v20('v20-mo-zone'),monetag_smart_link:v20('v20-mo-link'),monetag_script_api:v20('v20-mo-script'),monetag_wait_seconds:0})}
+function saveV20Texts(){saveV20Section('texts',{video_access_title:v20('v20-txt-access-title')||'🎁 Video Access',video_access_instruction:v20('v20-txt-access-instruction')||'ভিডিওটি দেখার জন্য প্রয়োজনীয় Ad গুলো দেখুন',ad_progress_seen_text:v20('v20-txt-seen')||'আপনার {completed}টি Ad দেখা হয়েছে ✅',ad_progress_remaining_text:v20('v20-txt-remaining')||'আরও {remaining}টি Ad বাকি — ভিডিও দেখতে বাকি Ad গুলো দেখুন।',ad_watch_button_text:v20('v20-txt-ad-button')||'📢 Ad দেখুন',all_ads_done_text:v20('v20-txt-done')||'✅ সব Ad সম্পন্ন হয়েছে\nআপনার ভিডিও আনলক হয়েছে',watch_video_button_text:v20('v20-txt-watch')||'🎬 ভিডিও দেখুন',video_access_secure_text:v20('v20-txt-secure')||'🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়',mini_bot_package_message:v20('v20-txt-mb-msg')||'🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇',mini_bot_package_button_text:v20('v20-txt-mb-btn')||'🎬 ভিডিও দেখুন',video_bot_package_message:v20('v20-txt-vb-msg')||'🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇',video_bot_package_button_text:v20('v20-txt-vb-btn')||'🎬 ভিডিও দেখুন',notification_bot_package_message:v20('v20-txt-nb-msg')||'🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇',notification_bot_package_button_text:v20('v20-txt-nb-btn')||'🎬 ভিডিও দেখুন',channel_package_message:v20('v20-txt-ch-msg')||'🔥 New Video Package\n\nPackage Name: {package_name}\n\nTotal Video: {total_video}',channel_package_button_text:v20('v20-txt-ch-btn')||'ভিডিও দেখুন'})}
+function v20(id){return document.getElementById(id)?.value||''}function v20c(id){return !!document.getElementById(id)?.checked}
+async function saveV20Task(){try{await apiFetch('/api/v20/admin/tasks',{method:'POST',body:JSON.stringify({id:v20('v20-task-id')||null,title:v20('v20-task-title'),task_type:v20('v20-task-type'),reward_amount:Number(v20('v20-task-reward')),task_link:v20('v20-task-link'),enabled:v20c('v20-task-enabled')})});showToast('Task saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Task save failed','danger')}}
+async function deleteV20Task(id){await apiFetch('/api/v20/admin/tasks/'+id,{method:'DELETE'});loadV20Admin()}
+async function saveV20Channel(){try{await apiFetch('/api/v20/admin/channels',{method:'POST',body:JSON.stringify({chat_id:Number(v20('v20-ch-id')),title:v20('v20-ch-title'),enabled:true})});showToast('Channel saved ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Channel save failed','danger')}}
+async function deleteV20Channel(id){await apiFetch('/api/v20/admin/channels/'+id,{method:'DELETE'});loadV20Admin()}
+async function reviewV20Withdraw(id,status){try{await apiFetch('/api/v20/admin/withdraw/'+id,{method:'POST',body:JSON.stringify({status})});showToast('Withdraw '+status+' ✅','success');loadV20Admin()}catch(e){showToast(e.message||'Failed','danger')}}
+const _v20OldProfile=updateProfileStats;updateProfileStats=async function(){await _v20OldProfile();await loadV20Profile()};
+const _v20OldSwitch=switchAdminSubView;switchAdminSubView=function(id,btn){_v20OldSwitch(id,btn);if(id.startsWith('v20'))loadV20Admin()};
+</script>
+</body>
+</html>
