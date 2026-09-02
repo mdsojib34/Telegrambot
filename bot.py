@@ -91,8 +91,12 @@ async def init_db():
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS all_ads_done_text TEXT DEFAULT '✅ সব Ad সম্পন্ন হয়েছে\nআপনার ভিডিও আনলক হয়েছে'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS watch_video_button_text TEXT DEFAULT '🎬 ভিডিও দেখুন'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_access_secure_text TEXT DEFAULT '🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়'",
+                "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS mini_bot_package_message TEXT DEFAULT '🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇'",
+                "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS mini_bot_package_button_text TEXT DEFAULT '🎬 ভিডিও দেখুন'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_bot_package_message TEXT DEFAULT '🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_bot_package_button_text TEXT DEFAULT '🎬 ভিডিও দেখুন'",
+                "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS notification_bot_package_message TEXT DEFAULT '🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇'",
+                "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS notification_bot_package_button_text TEXT DEFAULT '🎬 ভিডিও দেখুন'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS channel_package_message TEXT DEFAULT '🔥 New Video Package\n\nPackage Name: {package_name}\n\nTotal Video: {total_video}'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS channel_package_button_text TEXT DEFAULT 'ভিডিও দেখুন'"
             ):
@@ -222,8 +226,12 @@ async def get_settings():
         "all_ads_done_text": "✅ সব Ad সম্পন্ন হয়েছে\nআপনার ভিডিও আনলক হয়েছে",
         "watch_video_button_text": "🎬 ভিডিও দেখুন",
         "video_access_secure_text": "🛡️ 100% নিরাপদ • আপনার তথ্য গোপন রাখা হয়",
+        "mini_bot_package_message": "🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇",
+        "mini_bot_package_button_text": "🎬 ভিডিও দেখুন",
         "video_bot_package_message": "🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇",
         "video_bot_package_button_text": "🎬 ভিডিও দেখুন",
+        "notification_bot_package_message": "🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}\n\nনতুন ভিডিও দেখতে নিচের বাটনে ক্লিক করুন 👇",
+        "notification_bot_package_button_text": "🎬 ভিডিও দেখুন",
         "channel_package_message": "🔥 New Video Package\n\nPackage Name: {package_name}\n\nTotal Video: {total_video}",
         "channel_package_button_text": "ভিডিও দেখুন",
     }
@@ -952,52 +960,95 @@ async def broadcast_worker():
                 if not target_url:
                     continue
                 kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=button_text, url=target_url)]])
-                main_users = await db_fetchall("SELECT user_id FROM bot_users WHERE is_active=TRUE")
+                # Three-bot routing:
+                #   Mini Bot         -> TEXT ONLY (no thumbnail)
+                #   Video Bot        -> THUMBNAIL + editable caption/button
+                #   Notification Bot -> THUMBNAIL + editable caption/button
+                mini_users = await db_fetchall("SELECT user_id FROM mini_bot_users WHERE is_active=TRUE")
                 video_users = await db_fetchall("SELECT user_id FROM video_bot_users WHERE is_active=TRUE")
+                notification_users = await db_fetchall("SELECT user_id FROM bot_users WHERE is_active=TRUE")
                 total_video = (await db_fetchone("SELECT COUNT(*) c FROM videos WHERE published=TRUE"))["c"]
                 package_name = v.get('title') or 'New Video'
                 ok = fail = 0
-                async def send_package(client, uid, include_thumb=True):
+
+                def package_keyboard(text_key, fallback):
+                    label = (settings.get(text_key) or fallback).strip()[:64]
+                    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, url=target_url)]])
+
+                async def send_text_only(client, uid, msg_key, btn_key):
+                    text = _render_template(settings.get(msg_key), package_name=package_name, total_video=total_video)
+                    if not text.strip():
+                        text = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
+                    await client.send_message(uid, text, reply_markup=package_keyboard(btn_key, "🎬 ভিডিও দেখুন"), protect_content=True)
+
+                async def send_with_thumbnail(client, uid, msg_key, btn_key):
+                    text = _render_template(settings.get(msg_key), package_name=package_name, total_video=total_video)
+                    if not text.strip():
+                        text = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
+                    kb2 = package_keyboard(btn_key, "🎬 ভিডিও দেখুন")
                     thumb = v.get("thumb") or ""
-                    caption = f"🎬 {package_name}"
-                    if not include_thumb:
-                        # Video Bot notification is intentionally text-only: no package logo/thumbnail.
-                        vb_text = _render_template(settings.get("video_bot_package_message"), package_name=package_name, total_video=total_video)
-                        vb_btn = settings.get("video_bot_package_button_text") or "🎬 ভিডিও দেখুন"
-                        vb_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=vb_btn, url=target_url)]])
-                        await client.send_message(uid, vb_text, reply_markup=vb_kb, protect_content=True)
-                    elif thumb.startswith("http://") or thumb.startswith("https://"):
-                        await client.send_photo(uid, photo=thumb, caption=caption, reply_markup=kb, protect_content=True)
+                    if thumb.startswith("http://") or thumb.startswith("https://"):
+                        await client.send_photo(uid, photo=thumb, caption=text, reply_markup=kb2, protect_content=True)
                     elif thumb.startswith("data:image/") and "," in thumb:
                         header, encoded = thumb.split(",", 1)
                         ext = "png" if "png" in header else "jpg"
                         photo = BufferedInputFile(base64.b64decode(encoded), filename=f"thumb.{ext}")
-                        await client.send_photo(uid, photo=photo, caption=caption, reply_markup=kb, protect_content=True)
+                        await client.send_photo(uid, photo=photo, caption=text, reply_markup=kb2, protect_content=True)
                     else:
-                        await client.send_message(uid, caption, reply_markup=kb, protect_content=True)
-                for row in main_users:
+                        # If a package has no usable thumbnail, still deliver the notification.
+                        await client.send_message(uid, text, reply_markup=kb2, protect_content=True)
+
+                for row in mini_users:
                     uid = int(row["user_id"])
                     try:
-                        await send_package(bot, uid, True); ok += 1; await asyncio.sleep(0.05)
+                        await send_text_only(mini_bot, uid, "mini_bot_package_message", "mini_bot_package_button_text")
+                        ok += 1; await asyncio.sleep(0.05)
                     except Exception:
                         fail += 1
-                        await db_execute("UPDATE bot_users SET is_active=FALSE WHERE user_id=%s", (uid,))
+                        await db_execute("UPDATE mini_bot_users SET is_active=FALSE WHERE user_id=%s", (uid,))
+
                 for row in video_users:
                     uid = int(row["user_id"])
                     try:
-                        await send_package(video_bot, uid, False); ok += 1; await asyncio.sleep(0.05)
+                        await send_with_thumbnail(video_bot, uid, "video_bot_package_message", "video_bot_package_button_text")
+                        ok += 1; await asyncio.sleep(0.05)
                     except Exception:
                         fail += 1
                         await db_execute("UPDATE video_bot_users SET is_active=FALSE WHERE user_id=%s", (uid,))
-                # V20: publish notification to selected channels as well.
+
+                for row in notification_users:
+                    uid = int(row["user_id"])
+                    try:
+                        await send_with_thumbnail(bot, uid, "notification_bot_package_message", "notification_bot_package_button_text")
+                        ok += 1; await asyncio.sleep(0.05)
+                    except Exception:
+                        fail += 1
+                        await db_execute("UPDATE bot_users SET is_active=FALSE WHERE user_id=%s", (uid,))
+                # V20.4 Three-Bot package notification rule:
+                #   Mini Bot -> text + button only (never send thumbnail)
+                #   Video Bot / Notification Bot -> thumbnail + caption + button
+                # Selected groups/channels are published by Notification Bot, so they also get thumbnail.
                 try:
                     channels = await db_fetchall("SELECT chat_id FROM notification_channels WHERE enabled=TRUE ORDER BY id")
                     ch_caption = _render_template(settings.get("channel_package_message"), package_name=package_name, total_video=total_video)
+                    if not ch_caption.strip():
+                        ch_caption = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
                     ch_btn = settings.get("channel_package_button_text") or "ভিডিও দেখুন"
                     ch_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=ch_btn, url=target_url)]])
+                    thumb = v.get("thumb") or ""
                     for ch in channels:
+                        chat_id = int(ch["chat_id"])
                         try:
-                            await bot.send_message(int(ch["chat_id"]), ch_caption, reply_markup=ch_kb, protect_content=True)
+                            if thumb.startswith("http://") or thumb.startswith("https://"):
+                                await bot.send_photo(chat_id, photo=thumb, caption=ch_caption, reply_markup=ch_kb, protect_content=True)
+                            elif thumb.startswith("data:image/") and "," in thumb:
+                                header, encoded = thumb.split(",", 1)
+                                ext = "png" if "png" in header else "jpg"
+                                photo = BufferedInputFile(base64.b64decode(encoded), filename=f"package_thumb.{ext}")
+                                await bot.send_photo(chat_id, photo=photo, caption=ch_caption, reply_markup=ch_kb, protect_content=True)
+                            else:
+                                # Fallback only when this package has no usable thumbnail.
+                                await bot.send_message(chat_id, ch_caption, reply_markup=ch_kb, protect_content=True)
                         except Exception:
                             log.exception("V20 selected-channel notification failed chat=%s", ch.get("chat_id"))
                 except Exception:
@@ -1441,7 +1492,7 @@ async def api_v20_admin_config(request):
     u=require_admin(request)
     uid=int(u['id'])
     if request.method=='GET':
-        return web.Response(text=json.dumps({'tutorial':await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'"),'wallet':await v20_wallet_settings(),'buttons':await v20_video_buttons(),'ads':await db_fetchone("SELECT * FROM ad_settings WHERE id='main'"),'texts':{k:(await get_settings()).get(k) for k in ('video_access_title','video_access_instruction','ad_progress_seen_text','ad_progress_remaining_text','ad_watch_button_text','all_ads_done_text','watch_video_button_text','video_access_secure_text','video_bot_package_message','video_bot_package_button_text','channel_package_message','channel_package_button_text')},'channels':await db_fetchall("SELECT * FROM notification_channels ORDER BY id"),'tasks':await db_fetchall("SELECT * FROM tasks ORDER BY id DESC"),'withdraws':await db_fetchall("SELECT * FROM withdraw_requests ORDER BY created_at DESC LIMIT 200") if (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw')) else [],'is_owner':uid==OWNER_ID},default=str,ensure_ascii=False),content_type='application/json')
+        return web.Response(text=json.dumps({'tutorial':await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'"),'wallet':await v20_wallet_settings(),'buttons':await v20_video_buttons(),'ads':await db_fetchone("SELECT * FROM ad_settings WHERE id='main'"),'texts':{k:(await get_settings()).get(k) for k in ('video_access_title','video_access_instruction','ad_progress_seen_text','ad_progress_remaining_text','ad_watch_button_text','all_ads_done_text','watch_video_button_text','video_access_secure_text','mini_bot_package_message','mini_bot_package_button_text','video_bot_package_message','video_bot_package_button_text','notification_bot_package_message','notification_bot_package_button_text','channel_package_message','channel_package_button_text')},'channels':await db_fetchall("SELECT * FROM notification_channels ORDER BY id"),'tasks':await db_fetchall("SELECT * FROM tasks ORDER BY id DESC"),'withdraws':await db_fetchall("SELECT * FROM withdraw_requests ORDER BY created_at DESC LIMIT 200") if (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw')) else [],'is_owner':uid==OWNER_ID},default=str,ensure_ascii=False),content_type='application/json')
     d=await json_body(request); section=str(d.get('section') or '')
     if section=='tutorial':
         if uid!=OWNER_ID: raise web.HTTPForbidden(text='Owner only')
@@ -1455,7 +1506,7 @@ async def api_v20_admin_config(request):
         vals=[d.get(k) for k in keys]; await db_execute('UPDATE video_buttons SET '+','.join(f'{k}=%s' for k in keys)+',updated_at=CURRENT_TIMESTAMP WHERE id=\'main\'',tuple(vals))
     elif section=='texts':
         if not (uid==OWNER_ID or has_perm(uid,'can_manage_settings') or has_perm(uid,'can_manage_notifications')): raise web.HTTPForbidden()
-        keys=('video_access_title','video_access_instruction','ad_progress_seen_text','ad_progress_remaining_text','ad_watch_button_text','all_ads_done_text','watch_video_button_text','video_access_secure_text','video_bot_package_message','video_bot_package_button_text','channel_package_message','channel_package_button_text')
+        keys=('video_access_title','video_access_instruction','ad_progress_seen_text','ad_progress_remaining_text','ad_watch_button_text','all_ads_done_text','watch_video_button_text','video_access_secure_text','mini_bot_package_message','mini_bot_package_button_text','video_bot_package_message','video_bot_package_button_text','notification_bot_package_message','notification_bot_package_button_text','channel_package_message','channel_package_button_text')
         vals=[d.get(k) for k in keys]
         await db_execute('UPDATE app_settings SET '+','.join(f'{k}=%s' for k in keys)+',updated_at=CURRENT_TIMESTAMP WHERE id=\'main\'',tuple(vals))
     elif section=='ads':
