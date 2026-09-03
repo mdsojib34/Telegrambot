@@ -594,26 +594,8 @@ async def start_handler(message: Message):
     if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
         await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
         return
-    tutorial_sent = False
-    try:
-        tv = await db_fetchone("SELECT 1 x FROM tutorial_views WHERE user_id=%s", (message.from_user.id,))
-        tcfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
-        if not tv and tcfg.get("enabled", True):
-            # V20 owner tutorial config overrides legacy app_settings when set.
-            if tcfg.get("video_code"):
-                settings = dict(settings)
-                settings["tutorial_enabled"] = True
-                settings["tutorial_video_code"] = tcfg.get("video_code")
-                settings["tutorial_caption"] = ((tcfg.get("title") or "ভিডিও দেখার নিয়ম") + "\n\n" + (tcfg.get("description") or "")).strip()
-                settings["tutorial_button_text"] = tcfg.get("button_text") or "🏠 Home Page"
-            tutorial_sent = await send_start_tutorial(message, settings)
-            if tutorial_sent:
-                await db_execute("INSERT INTO tutorial_views(user_id,viewed_at) VALUES(%s,%s) ON CONFLICT(user_id) DO NOTHING", (message.from_user.id, utcnow_sql()))
-    except Exception:
-        log.exception("V20 tutorial tracking failed")
-        tutorial_sent = await send_start_tutorial(message, settings)
-    if tutorial_sent:
-        return
+
+    # V20.6: Tutorial video is intentionally shown by Mini Bot only.
     welcome = settings.get("welcome_text") or (
         f"👋 স্বাগতম {settings.get('brand_name','Bangladesh Viral Video')} Bot-এ।\n\n"
         "নিচের বাটন থেকে Mini App খুলুন এবং আপনার পছন্দের ভিডিও দেখুন।"
@@ -931,7 +913,11 @@ async def set_tutorial_callback(query: CallbackQuery):
         await query.answer("ভিডিও mapping পাওয়া যায়নি", show_alert=True)
         return
     await db_execute("UPDATE app_settings SET tutorial_video_code=%s, tutorial_enabled=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id='main'", (code,))
-    await db_execute("UPDATE tutorial_settings SET video_code=%s,enabled=TRUE,updated_by=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'", (code, OWNER_ID))
+    await db_execute("""INSERT INTO tutorial_settings(id,video_code,enabled,updated_by,updated_at)
+                      VALUES('main',%s,TRUE,%s,CURRENT_TIMESTAMP)
+                      ON CONFLICT(id) DO UPDATE SET video_code=EXCLUDED.video_code,enabled=TRUE,
+                      updated_by=EXCLUDED.updated_by,updated_at=CURRENT_TIMESTAMP""", (code, OWNER_ID))
+    await db_execute("DELETE FROM tutorial_views")
     await query.answer("Tutorial video সেট হয়েছে ✅", show_alert=True)
     try:
         await query.message.edit_reply_markup(reply_markup=None)
@@ -1496,7 +1482,25 @@ async def api_v20_admin_config(request):
     d=await json_body(request); section=str(d.get('section') or '')
     if section=='tutorial':
         if uid!=OWNER_ID: raise web.HTTPForbidden(text='Owner only')
-        await db_execute("UPDATE tutorial_settings SET enabled=%s,video_code=%s,title=%s,description=%s,button_text=%s,updated_by=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(bool(d.get('enabled',True)),d.get('video_code'),str(d.get('title') or '')[:255],d.get('description'),str(d.get('button_text') or '🏠 Home Page')[:100],uid))
+        enabled = bool(d.get('enabled', True))
+        code = str(d.get('video_code') or '').strip() or None
+        title = str(d.get('title') or '')[:255]
+        description = d.get('description')
+        button_text = str(d.get('button_text') or '🏠 Home Page')[:100]
+        # Upsert so Tutorial Settings works even if the seed row is missing.
+        await db_execute("""INSERT INTO tutorial_settings(id,enabled,video_code,title,description,button_text,updated_by,updated_at)
+                          VALUES('main',%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP)
+                          ON CONFLICT(id) DO UPDATE SET enabled=EXCLUDED.enabled,video_code=EXCLUDED.video_code,
+                          title=EXCLUDED.title,description=EXCLUDED.description,button_text=EXCLUDED.button_text,
+                          updated_by=EXCLUDED.updated_by,updated_at=CURRENT_TIMESTAMP""",
+                         (enabled,code,title,description,button_text,uid))
+        # Keep legacy settings synchronized because older code paths still read these fields.
+        caption = (title + ('\n\n' + str(description).strip() if description else '')).strip() or 'ভিডিও দেখার নিয়ম'
+        await db_execute("UPDATE app_settings SET tutorial_enabled=%s,tutorial_video_code=%s,tutorial_caption=%s,tutorial_button_text=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",
+                         (enabled,code,caption,button_text))
+        # A newly saved tutorial must be visible again on the next Mini Bot /start.
+        # Previously tutorial_views prevented already-seen users from seeing the updated tutorial.
+        await db_execute("DELETE FROM tutorial_views")
     elif section=='wallet':
         if not (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw') or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden()
         await db_execute("UPDATE wallet_settings SET per_video_reward=%s,daily_reward_limit=%s,minimum_withdraw=%s,maximum_withdraw=%s,withdraw_enabled=%s,payment_methods=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",(float(d.get('per_video_reward') or 0),float(d.get('daily_reward_limit') or 0),float(d.get('minimum_withdraw') or 0),float(d.get('maximum_withdraw') or 0),bool(d.get('withdraw_enabled',True)),str(d.get('payment_methods') or 'bKash,Nagad')))
