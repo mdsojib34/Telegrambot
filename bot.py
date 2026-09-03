@@ -82,6 +82,16 @@ async def init_db():
         async with db_pool.acquire() as conn:
             await conn.execute(open(schema_path, "r", encoding="utf-8").read())
             # V20.1 text-control migration: additive only, safe for existing databases.
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS tutorial_last_messages (
+                    bot_role TEXT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    chat_id BIGINT NOT NULL,
+                    message_id BIGINT NOT NULL,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (bot_role, user_id)
+                )
+            """)
             for ddl in (
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_access_title TEXT DEFAULT '🎁 Video Access'",
                 "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS video_access_instruction TEXT DEFAULT 'ভিডিওটি দেখার জন্য প্রয়োজনীয় Ad গুলো দেখুন'",
@@ -552,49 +562,97 @@ async def deliver_video_from_video_bot(message: Message, code: str):
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Video Bot-কে Storage Channel-এর Admin করুন।")
 
 
-async def send_start_video(bot_instance, message, settings, bot_label="start", reply_markup=None, fallback_caption=None):
-    """Send Start Video as ONE Telegram message: video + text/caption + button.
+async def _delete_previous_tutorial(bot_instance, bot_role: str, user_id: int):
+    """Delete only the previous tutorial card sent by this bot to this user."""
+    try:
+        old = await db_fetchone(
+            "SELECT chat_id,message_id FROM tutorial_last_messages WHERE bot_role=%s AND user_id=%s",
+            (bot_role, int(user_id)),
+        )
+        if old:
+            try:
+                await bot_instance.delete_message(int(old["chat_id"]), int(old["message_id"]))
+            except Exception:
+                # Already deleted / too old / unavailable is fine.
+                pass
+            await db_execute(
+                "DELETE FROM tutorial_last_messages WHERE bot_role=%s AND user_id=%s",
+                (bot_role, int(user_id)),
+            )
+    except Exception:
+        log.exception("%s previous tutorial cleanup failed", bot_role)
 
-    Mini Bot and Notification Bot use this helper. Video Bot is excluded.
-    Returns True only when the configured video was successfully sent.
+
+def _tutorial_video_code(value) -> str:
+    """Accept video_105 OR a full Telegram deep link containing start=video_105."""
+    raw = str(value or "").strip()
+    m = re.search(r"(video_[A-Za-z0-9_-]+)", raw)
+    return m.group(1) if m else ""
+
+
+async def send_start_video(
+    bot_instance,
+    message,
+    settings,
+    bot_role="start",
+    reply_markup=None,
+    fallback_caption=None,
+):
+    """Send ONE clean Tutorial card: video + editable text + button.
+
+    Runs on /start for Mini Bot, Notification Bot and Video Bot.
+    Before sending, the previous tutorial card from the same bot/user is deleted.
     """
     try:
         cfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
         if not cfg.get("enabled", True):
             return False
-        code = str(cfg.get("video_code") or "").strip()
+
+        code = _tutorial_video_code(cfg.get("video_code"))
         if not code:
             return False
         rec = await lookup_video(code)
         if not rec:
-            log.warning("%s start video mapping missing: %s", bot_label, code)
+            log.warning("%s tutorial mapping missing: %s", bot_role, code)
             return False
 
         title = str(cfg.get("title") or "").strip()
         description = str(cfg.get("description") or "").strip()
-        configured_caption = "\n\n".join(x for x in (title, description) if x).strip()
-        caption = configured_caption or str(fallback_caption or "").strip() or "🎬 ভিডিও দেখার নিয়ম"
+        caption = "\n\n".join(x for x in (title, description) if x).strip()
+        if not caption:
+            caption = str(fallback_caption or "").strip() or "🎬 ভিডিও দেখার নিয়ম"
 
-        # Keep the existing bot CTA, but allow the Start Video panel's button label
-        # to rename that same button without changing its destination.
-        button_text = str(cfg.get("button_text") or "").strip()[:64]
-        kb = reply_markup
-        if kb and button_text:
-            try:
-                rows = []
-                for row in kb.inline_keyboard:
-                    new_row = []
-                    for b in row:
-                        data = b.model_dump(exclude_none=True)
-                        data["text"] = button_text
-                        new_row.append(InlineKeyboardButton(**data))
-                    rows.append(new_row)
-                kb = InlineKeyboardMarkup(inline_keyboard=rows)
-            except Exception:
-                log.exception("%s start video button-label build failed", bot_label)
-                kb = reply_markup
+        button_text = str(cfg.get("button_text") or "🏠 Home Page").strip()[:64]
 
-        await bot_instance.copy_message(
+        # Keep the destination appropriate for each bot, but never put Ad controls in Video Bot.
+        if bot_role == "video":
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text=button_text,
+                    url=f"https://t.me/{MINI_BOT_USERNAME}?start=home"
+                )
+            ]])
+        else:
+            kb = reply_markup
+            if kb and button_text:
+                try:
+                    rows = []
+                    for row in kb.inline_keyboard:
+                        new_row = []
+                        for b in row:
+                            data = b.model_dump(exclude_none=True)
+                            data["text"] = button_text
+                            new_row.append(InlineKeyboardButton(**data))
+                        rows.append(new_row)
+                    kb = InlineKeyboardMarkup(inline_keyboard=rows)
+                except Exception:
+                    kb = reply_markup
+
+        await _delete_previous_tutorial(
+            bot_instance, bot_role, int(message.from_user.id)
+        )
+
+        sent = await bot_instance.copy_message(
             chat_id=message.chat.id,
             from_chat_id=int(rec["channel_id"]),
             message_id=int(rec["message_id"]),
@@ -602,9 +660,19 @@ async def send_start_video(bot_instance, message, settings, bot_label="start", r
             reply_markup=kb,
             protect_content=True,
         )
+        sent_id = int(getattr(sent, "message_id", 0) or 0)
+        if sent_id:
+            await db_execute(
+                """INSERT INTO tutorial_last_messages(bot_role,user_id,chat_id,message_id,updated_at)
+                   VALUES(%s,%s,%s,%s,CURRENT_TIMESTAMP)
+                   ON CONFLICT(bot_role,user_id) DO UPDATE SET
+                   chat_id=EXCLUDED.chat_id,message_id=EXCLUDED.message_id,
+                   updated_at=CURRENT_TIMESTAMP""",
+                (bot_role, int(message.from_user.id), int(message.chat.id), sent_id),
+            )
         return True
     except Exception:
-        log.exception("%s start video failed", bot_label)
+        log.exception("%s tutorial send failed", bot_role)
         return False
 
 
@@ -623,12 +691,10 @@ async def mini_bot_start_handler(message: Message):
     elif payload.startswith("welcome"):
         welcome = settings.get("join_welcome_text") or welcome
     kb = await mini_webapp_keyboard(settings)
-    # V20.8: Mini Bot /start sends ONE message: Tutorial Video + text/caption + existing Home button.
-    # If no Start Video is configured (or delivery fails), fall back to the old welcome text + button.
-    if not payload:
-        sent = await send_start_video(mini_bot, message, settings, "mini", reply_markup=kb, fallback_caption=welcome)
-        if sent:
-            return
+    # V21.1: Every Mini Bot /start refreshes the Tutorial card.
+    sent = await send_start_video(mini_bot, message, settings, "mini", reply_markup=kb, fallback_caption=welcome)
+    if sent:
+        return
     await message.answer(welcome, reply_markup=kb)
 
 
@@ -642,22 +708,48 @@ async def mini_bot_private_handler(message: Message):
 @video_dp.message(CommandStart())
 async def video_bot_start_handler(message: Message):
     await save_video_bot_user(message)
+    settings = await get_settings()
     parts = (message.text or "").split(maxsplit=1)
     payload = parts[1].strip() if len(parts) > 1 else ""
-    if payload.startswith("video_"):
-        await deliver_video_from_video_bot(message, payload)
+
+    # Always refresh the clean Tutorial card first.
+    await send_start_video(
+        video_bot,
+        message,
+        settings,
+        "video",
+        fallback_caption="🎬 ভিডিও দেখার নিয়ম"
+    )
+
+    # A deep link such as https://t.me/Viral_video99_bot?start=video_105
+    # opens the protected video directly in Video Bot. No Ad UI is shown here.
+    code = _tutorial_video_code(payload)
+    if code:
+        await deliver_video_from_video_bot(message, code)
         return
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 Main Video Bot খুলুন", url=f"https://t.me/{MINI_BOT_USERNAME}")]])
-    await message.answer("👋 এই Bot protected video delivery-এর জন্য।\n\nনতুন ভিডিও খুঁজতে Mini Bot খুলুন।", reply_markup=kb)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🏠 Mini Bot খুলুন",
+            url=f"https://t.me/{MINI_BOT_USERNAME}?start=home"
+        )
+    ]])
+    # If tutorial is disabled/missing, keep a minimal fallback.
+    cfg = await db_fetchone("SELECT enabled,video_code FROM tutorial_settings WHERE id='main'") or {}
+    if not cfg.get("enabled", True) or not _tutorial_video_code(cfg.get("video_code")):
+        await message.answer(
+            "👋 এই Bot protected video delivery-এর জন্য।",
+            reply_markup=kb
+        )
 
 
 @video_dp.message(F.chat.type == "private")
 async def video_bot_private_handler(message: Message):
     await save_video_bot_user(message)
     text = (message.text or "").strip()
-    m = VIDEO_CODE_RE.search(text)
-    if m:
-        await deliver_video_from_video_bot(message, m.group(1))
+    code = _tutorial_video_code(text)
+    if code:
+        await deliver_video_from_video_bot(message, code)
 
 
 async def send_start_tutorial(message: Message, settings):
@@ -717,10 +809,9 @@ async def start_handler(message: Message):
         "নিচের বাটন থেকে Mini App খুলুন এবং আপনার পছন্দের ভিডিও দেখুন।"
     )
     kb = await webapp_keyboard(settings)
-    if not payload:
-        sent = await send_start_video(bot, message, settings, "notification", reply_markup=kb, fallback_caption=welcome)
-        if sent:
-            return
+    sent = await send_start_video(bot, message, settings, "notification", reply_markup=kb, fallback_caption=welcome)
+    if sent:
+        return
     await message.answer(welcome, reply_markup=kb)
 
 
@@ -1608,7 +1699,8 @@ async def api_v20_admin_config(request):
     if section=='tutorial':
         if not (uid==OWNER_ID or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden(text='Owner/Admin settings permission required')
         enabled = bool(d.get('enabled', True))
-        code = str(d.get('video_code') or '').strip() or None
+        raw_code = str(d.get('video_code') or '').strip()
+        code = _tutorial_video_code(raw_code) or None
         title = str(d.get('title') or '')[:255]
         description = d.get('description')
         button_text = str(d.get('button_text') or '🏠 Home Page')[:100]
