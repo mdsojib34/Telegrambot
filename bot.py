@@ -475,25 +475,30 @@ async def deliver_video_from_video_bot(message: Message, code: str):
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Video Bot-কে Storage Channel-এর Admin করুন।")
 
 
-async def send_mini_start_tutorial(message: Message, settings):
+async def send_start_video(bot_instance, message, settings, bot_label="start"):
+    """Attach the configured Start Video before the bot's existing welcome text/buttons.
+
+    Used by Mini Bot and Notification Bot only. Video Bot is intentionally excluded.
+    The video has no replacement caption/buttons: the existing welcome message is sent
+    immediately afterwards by the normal /start handler.
+    """
     try:
-        if not message.from_user:
-            return False
-        seen = await db_fetchone("SELECT 1 x FROM tutorial_views WHERE user_id=%s", (message.from_user.id,))
         cfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
-        if seen or not cfg.get("enabled", True) or not cfg.get("video_code"):
+        if not cfg.get("enabled", True) or not cfg.get("video_code"):
             return False
         rec = await lookup_video(str(cfg.get("video_code")))
         if not rec:
+            log.warning("%s start video mapping missing: %s", bot_label, cfg.get("video_code"))
             return False
-        url = (settings.get("web_app_url") or DEFAULT_MINI_APP_URL or "").strip()
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=str(cfg.get("button_text") or "🏠 Home Page")[:64], web_app=WebAppInfo(url=url))]]) if valid_webapp_url(url) else None
-        caption = ((cfg.get("title") or "ভিডিও দেখার নিয়ম") + "\n\n" + (cfg.get("description") or "")).strip()
-        await mini_bot.copy_message(chat_id=message.chat.id,from_chat_id=int(rec["channel_id"]),message_id=int(rec["message_id"]),caption=caption,reply_markup=kb,protect_content=True)
-        await db_execute("INSERT INTO tutorial_views(user_id,viewed_at) VALUES(%s,%s) ON CONFLICT(user_id) DO NOTHING", (message.from_user.id,utcnow_sql()))
+        await bot_instance.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=int(rec["channel_id"]),
+            message_id=int(rec["message_id"]),
+            protect_content=True,
+        )
         return True
     except Exception:
-        log.exception("Mini Bot V20 tutorial failed")
+        log.exception("%s start video failed", bot_label)
         return False
 
 
@@ -512,8 +517,9 @@ async def mini_bot_start_handler(message: Message):
     elif payload.startswith("welcome"):
         welcome = settings.get("join_welcome_text") or welcome
     kb = await mini_webapp_keyboard(settings)
-    if not payload and await send_mini_start_tutorial(message, settings):
-        return
+    # V20.7: Mini Bot normal /start = Start Video + existing Welcome Text + existing Buttons.
+    if not payload:
+        await send_start_video(mini_bot, message, settings, "mini")
     await message.answer(welcome, reply_markup=kb)
 
 
@@ -595,7 +601,10 @@ async def start_handler(message: Message):
         await message.answer(settings.get("maintenance_message") or "⚙️ সিস্টেমটি এখন Maintenance Mode-এ আছে। পরে আবার চেষ্টা করুন।")
         return
 
-    # V20.6: Tutorial video is intentionally shown by Mini Bot only.
+    # V20.7: Notification Bot normal /start = Start Video + existing Welcome Text + existing Buttons.
+    # Video Bot remains unchanged and never receives this Start Video.
+    if not payload:
+        await send_start_video(bot, message, settings, "notification")
     welcome = settings.get("welcome_text") or (
         f"👋 স্বাগতম {settings.get('brand_name','Bangladesh Viral Video')} Bot-এ।\n\n"
         "নিচের বাটন থেকে Mini App খুলুন এবং আপনার পছন্দের ভিডিও দেখুন।"
@@ -1481,7 +1490,7 @@ async def api_v20_admin_config(request):
         return web.Response(text=json.dumps({'tutorial':await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'"),'wallet':await v20_wallet_settings(),'buttons':await v20_video_buttons(),'ads':await db_fetchone("SELECT * FROM ad_settings WHERE id='main'"),'texts':{k:(await get_settings()).get(k) for k in ('video_access_title','video_access_instruction','ad_progress_seen_text','ad_progress_remaining_text','ad_watch_button_text','all_ads_done_text','watch_video_button_text','video_access_secure_text','mini_bot_package_message','mini_bot_package_button_text','video_bot_package_message','video_bot_package_button_text','notification_bot_package_message','notification_bot_package_button_text','channel_package_message','channel_package_button_text')},'channels':await db_fetchall("SELECT * FROM notification_channels ORDER BY id"),'tasks':await db_fetchall("SELECT * FROM tasks ORDER BY id DESC"),'withdraws':await db_fetchall("SELECT * FROM withdraw_requests ORDER BY created_at DESC LIMIT 200") if (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw')) else [],'is_owner':uid==OWNER_ID},default=str,ensure_ascii=False),content_type='application/json')
     d=await json_body(request); section=str(d.get('section') or '')
     if section=='tutorial':
-        if uid!=OWNER_ID: raise web.HTTPForbidden(text='Owner only')
+        if not (uid==OWNER_ID or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden(text='Owner/Admin settings permission required')
         enabled = bool(d.get('enabled', True))
         code = str(d.get('video_code') or '').strip() or None
         title = str(d.get('title') or '')[:255]
@@ -1498,8 +1507,8 @@ async def api_v20_admin_config(request):
         caption = (title + ('\n\n' + str(description).strip() if description else '')).strip() or 'ভিডিও দেখার নিয়ম'
         await db_execute("UPDATE app_settings SET tutorial_enabled=%s,tutorial_video_code=%s,tutorial_caption=%s,tutorial_button_text=%s,updated_at=CURRENT_TIMESTAMP WHERE id='main'",
                          (enabled,code,caption,button_text))
-        # A newly saved tutorial must be visible again on the next Mini Bot /start.
-        # Previously tutorial_views prevented already-seen users from seeing the updated tutorial.
+        # V20.7 Start Video is shown on each normal /start in Mini + Notification Bot.
+        # Clear legacy one-time-view data for compatibility with older deployments.
         await db_execute("DELETE FROM tutorial_views")
     elif section=='wallet':
         if not (uid==OWNER_ID or has_perm(uid,'can_manage_withdraw') or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden()
