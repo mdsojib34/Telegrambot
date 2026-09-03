@@ -1226,17 +1226,22 @@ async def broadcast_worker():
                 #   Mini Bot -> text + button only (never send thumbnail)
                 #   Video Bot / Notification Bot -> thumbnail + caption + button
                 # Selected groups/channels are published by Notification Bot, so they also get thumbnail.
+                channel_ok = channel_fail = 0
+                channel_errors = []
                 try:
-                    channels = await db_fetchall("SELECT chat_id FROM notification_channels WHERE enabled=TRUE ORDER BY id")
+                    channels = await db_fetchall("SELECT id,chat_id,title FROM notification_channels WHERE enabled=TRUE ORDER BY id")
                     ch_caption = _render_template(settings.get("channel_package_message"), package_name=package_name, total_video=total_video)
                     if not ch_caption.strip():
                         ch_caption = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
-                    ch_btn = settings.get("channel_package_button_text") or "ভিডিও দেখুন"
+                    ch_btn = (settings.get("channel_package_button_text") or "ভিডিও দেখুন").strip()[:64]
                     ch_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=ch_btn, url=target_url)]])
                     thumb = v.get("thumb") or ""
                     for ch in channels:
                         chat_id = int(ch["chat_id"])
                         try:
+                            status = await _notification_channel_status(chat_id)
+                            if not status.get("ok"):
+                                raise RuntimeError(status.get("error") or "Notification Bot cannot post to target")
                             if thumb.startswith("http://") or thumb.startswith("https://"):
                                 await bot.send_photo(chat_id, photo=thumb, caption=ch_caption, reply_markup=ch_kb, protect_content=True)
                             elif thumb.startswith("data:image/") and "," in thumb:
@@ -1245,14 +1250,25 @@ async def broadcast_worker():
                                 photo = BufferedInputFile(base64.b64decode(encoded), filename=f"package_thumb.{ext}")
                                 await bot.send_photo(chat_id, photo=photo, caption=ch_caption, reply_markup=ch_kb, protect_content=True)
                             else:
-                                # Fallback only when this package has no usable thumbnail.
                                 await bot.send_message(chat_id, ch_caption, reply_markup=ch_kb, protect_content=True)
-                        except Exception:
-                            log.exception("V20 selected-channel notification failed chat=%s", ch.get("chat_id"))
-                except Exception:
-                    log.exception("V20 selected-channel broadcast failed")
+                            channel_ok += 1
+                        except Exception as e:
+                            channel_fail += 1
+                            channel_errors.append(f"{ch.get('title') or chat_id}: {str(e)[:120]}")
+                            log.exception("selected-channel notification failed chat=%s", chat_id)
+                except Exception as e:
+                    channel_fail += 1
+                    channel_errors.append(str(e)[:120])
+                    log.exception("selected-channel broadcast failed")
                 await db_execute("UPDATE videos SET broadcast_sent=TRUE WHERE id=%s", (v["id"],))
-                await bot.send_message(OWNER_ID, f"📢 Broadcast complete\n{v.get('title','')}\n✅ Sent: {ok}\n❌ Failed: {fail}")
+                report = (
+                    f"📢 Broadcast complete\n{v.get('title','')}\n"
+                    f"👤 Bot users sent: {ok}\n❌ Bot users failed: {fail}\n"
+                    f"📣 Channels sent: {channel_ok}\n⚠️ Channels failed: {channel_fail}"
+                )
+                if channel_errors:
+                    report += "\n\n" + "\n".join("• " + e for e in channel_errors[:5])
+                await bot.send_message(OWNER_ID, report)
         except Exception:
             log.exception("broadcast worker error")
         await asyncio.sleep(POLL_SECONDS)
@@ -1747,13 +1763,98 @@ async def api_v20_admin_tasks(request):
     else: await db_execute("DELETE FROM tasks WHERE id=%s",(int(request.match_info['task_id']),))
     return web.json_response({'ok':True})
 
+async def _notification_channel_status(chat_id: int):
+    """Verify that the Notification Bot can post to the configured target."""
+    try:
+        chat = await bot.get_chat(int(chat_id))
+        me = await bot.get_me()
+        member = await bot.get_chat_member(int(chat_id), me.id)
+        status = str(getattr(member, "status", "") or "")
+        can_post = bool(getattr(member, "can_post_messages", False))
+        chat_type = str(getattr(chat, "type", "") or "")
+        # In groups/supergroups an ordinary member can send unless restricted.
+        if chat_type in ("group", "supergroup"):
+            allowed = status not in ("left", "kicked", "restricted")
+        else:
+            allowed = status in ("administrator", "creator") and can_post
+        return {
+            "ok": bool(allowed),
+            "chat_id": int(chat_id),
+            "title": getattr(chat, "title", None),
+            "chat_type": chat_type,
+            "bot_status": status,
+            "can_post_messages": can_post,
+            "error": None if allowed else (
+                "Notification Bot-কে channel-এর Admin করে Post Messages permission দিন"
+                if chat_type == "channel"
+                else "Notification Bot-এর group send permission নেই"
+            ),
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "chat_id": int(chat_id),
+            "title": None,
+            "chat_type": None,
+            "bot_status": None,
+            "can_post_messages": False,
+            "error": str(e),
+        }
+
+
 async def api_v20_admin_channels(request):
     u=require_admin(request); uid=int(u['id'])
-    if not (uid==OWNER_ID or has_perm(uid,'can_manage_notifications') or has_perm(uid,'can_manage_settings')): raise web.HTTPForbidden()
+    if not (uid==OWNER_ID or has_perm(uid,'can_manage_notifications') or has_perm(uid,'can_manage_settings')):
+        raise web.HTTPForbidden()
+
     if request.method=='POST':
-        d=await json_body(request); cid=int(d.get('chat_id')); await db_execute("INSERT INTO notification_channels(chat_id,title,enabled) VALUES(%s,%s,%s) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title,enabled=EXCLUDED.enabled,updated_at=CURRENT_TIMESTAMP",(cid,d.get('title'),bool(d.get('enabled',True))))
-    else: await db_execute("DELETE FROM notification_channels WHERE id=%s",(int(request.match_info['channel_id']),))
+        d=await json_body(request)
+        try:
+            cid=int(str(d.get('chat_id') or '').strip())
+        except Exception:
+            raise web.HTTPBadRequest(text='Valid Channel ID দিন, যেমন -1001234567890')
+        status=await _notification_channel_status(cid)
+        title=str(d.get('title') or status.get('title') or cid)
+        await db_execute(
+            "INSERT INTO notification_channels(chat_id,title,enabled) VALUES(%s,%s,%s) "
+            "ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title,enabled=EXCLUDED.enabled,updated_at=CURRENT_TIMESTAMP",
+            (cid,title,bool(status.get('ok')))
+        )
+        return web.json_response({
+            'ok': bool(status.get('ok')),
+            'saved': True,
+            'channel': status,
+            'message': 'Channel verified ✅' if status.get('ok') else status.get('error')
+        }, status=200 if status.get('ok') else 400)
+
+    await db_execute("DELETE FROM notification_channels WHERE id=%s",(int(request.match_info['channel_id']),))
     return web.json_response({'ok':True})
+
+
+async def api_v20_admin_channel_test(request):
+    u=require_admin(request); uid=int(u['id'])
+    if not (uid==OWNER_ID or has_perm(uid,'can_manage_notifications') or has_perm(uid,'can_manage_settings')):
+        raise web.HTTPForbidden()
+    row=await db_fetchone("SELECT * FROM notification_channels WHERE id=%s",(int(request.match_info['channel_id']),))
+    if not row:
+        raise web.HTTPNotFound(text='Channel not found')
+    cid=int(row['chat_id'])
+    status=await _notification_channel_status(cid)
+    if not status.get('ok'):
+        await db_execute("UPDATE notification_channels SET enabled=FALSE,updated_at=CURRENT_TIMESTAMP WHERE id=%s",(int(row['id']),))
+        raise web.HTTPBadRequest(text=status.get('error') or 'Notification Bot cannot post here')
+    try:
+        await bot.send_message(
+            cid,
+            "✅ Notification Channel Test Successful\n\nএই channel-এ package notification পাঠানো যাবে।",
+            protect_content=True
+        )
+        await db_execute("UPDATE notification_channels SET enabled=TRUE,updated_at=CURRENT_TIMESTAMP WHERE id=%s",(int(row['id']),))
+        return web.json_response({'ok':True,'channel':status})
+    except Exception as e:
+        await db_execute("UPDATE notification_channels SET enabled=FALSE,updated_at=CURRENT_TIMESTAMP WHERE id=%s",(int(row['id']),))
+        raise web.HTTPBadRequest(text=f'Test notification failed: {e}')
+
 
 async def api_v20_admin_withdraw(request):
     u=require_admin(request); uid=int(u['id'])
@@ -2139,6 +2240,7 @@ async def start_web_server():
     app.router.add_delete("/api/v20/admin/tasks/{task_id}", api_v20_admin_tasks)
     app.router.add_post("/api/v20/admin/channels", api_v20_admin_channels)
     app.router.add_delete("/api/v20/admin/channels/{channel_id}", api_v20_admin_channels)
+    app.router.add_post("/api/v20/admin/channels/{channel_id}/test", api_v20_admin_channel_test)
     app.router.add_post("/api/v20/admin/withdraw/{request_id}", api_v20_admin_withdraw)
     app.router.add_get("/api/videos/{video_id}/social", api_video_social)
     app.router.add_post("/api/videos/{video_id}/favorite", api_toggle_favorite)
