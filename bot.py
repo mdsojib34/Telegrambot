@@ -1607,6 +1607,23 @@ async def api_admin_drafts(request):
     return web.Response(text=json.dumps({"drafts": rows}, default=str, ensure_ascii=False), content_type="application/json")
 
 
+async def api_admin_draft_delete(request):
+    """Delete one pending Auto Thumbnail Draft from upload_drafts.
+
+    This removes the draft entry from the Admin Panel only. It does not delete
+    the original video from the private Telegram Storage Channel or video_map.
+    """
+    require_admin(request, "can_manage_content")
+    code = str(request.match_info.get("video_code") or "").strip()
+    if not code:
+        raise web.HTTPBadRequest(text="Missing video_code")
+    row = await db_fetchone("SELECT id,video_code FROM upload_drafts WHERE video_code=%s AND consumed=FALSE", (code,))
+    if not row:
+        raise web.HTTPNotFound(text="Draft not found")
+    await db_execute("DELETE FROM upload_drafts WHERE video_code=%s AND consumed=FALSE", (code,))
+    return web.json_response({"ok": True, "deleted": code})
+
+
 async def api_admin_video_save(request):
     require_admin_any(request, "can_manage_packages", "can_manage_content")
     d = await json_body(request)
@@ -1961,6 +1978,7 @@ async def start_web_server():
     app.router.add_post("/api/videos/{video_id}/ad-session", api_ad_session)
     app.router.add_post("/api/videos/{video_id}/ad-complete", api_ad_complete)
     app.router.add_get("/api/admin/drafts", api_admin_drafts)
+    app.router.add_delete("/api/admin/drafts/{video_code}", api_admin_draft_delete)
     app.router.add_post("/api/admin/videos", api_admin_video_save)
     app.router.add_delete("/api/admin/videos/{video_id}", api_admin_video_delete)
     app.router.add_post("/api/admin/videos/{video_id}/rebroadcast", api_admin_video_rebroadcast)
