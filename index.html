@@ -420,8 +420,17 @@ body{background:radial-gradient(900px 500px at 10% -5%,rgba(124,77,255,.24),tran
 .v20-wallet-card{margin:12px 0;padding:16px;border-radius:20px;background:linear-gradient(145deg,#181d34,#24183d);border:1px solid rgba(160,130,255,.24);box-shadow:var(--shadow-card)}.v20-wallet-balance{font-size:28px;font-weight:800;margin:4px 0}.v20-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-mini{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px}.v20-mini b{display:block;font-size:16px}.v20-admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v20-admin-grid .full{grid-column:1/-1}.v20-list{display:grid;gap:8px;margin-top:10px}.v20-list-item{padding:11px;border-radius:13px;background:var(--surface-2);border:1px solid rgba(255,255,255,.06)}
 
 /* ===== V20.5 MINI BOT HOME PORTRAIT PACKAGE SIZE ===== */
-#view-home #main-grid.gallery-grid .gallery-thumb{aspect-ratio:3/5!important;}
-#view-home #main-grid.gallery-grid .gallery-thumb img{width:100%;height:100%;object-fit:cover;object-position:center;}
+/* V20.6 Mini Bot Home — YouTube-style serial video list */
+#view-home #main-grid.gallery-grid{display:grid!important;grid-template-columns:1fr!important;gap:14px!important;}
+#view-home #main-grid.gallery-grid .gallery-card{width:100%;border-radius:16px;overflow:hidden;}
+#view-home #main-grid.gallery-grid .gallery-thumb{aspect-ratio:16/9!important;background:#05070c!important;}
+#view-home #main-grid.gallery-grid .gallery-thumb img{width:100%;height:100%;object-fit:contain!important;object-position:center!important;background:#05070c;display:block;}
+#view-home #main-grid.gallery-grid .gallery-body{padding:10px 12px 8px;}
+#view-home #main-grid.gallery-grid .gallery-title{font-size:14px;line-height:1.4;min-height:0;}
+#view-home #main-grid.gallery-grid .gallery-desc{font-size:10px;line-height:1.4;}
+#view-home #main-grid.gallery-grid .gallery-meta{font-size:9px;}
+#view-home #main-grid.gallery-grid .gallery-actions{padding:0 11px 11px;grid-template-columns:1fr 42px;}
+#view-home #main-grid.gallery-grid .gallery-watch{font-size:11px;padding:10px 8px;}
 </style>
 </head>
 <body>
