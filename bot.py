@@ -357,6 +357,67 @@ async def delete_later(chat_id: int, message_id: int, minutes: int):
         log.warning("auto delete failed chat=%s msg=%s", chat_id, message_id)
 
 
+
+async def reset_expired_video_access(user_id: int, video_code: str, settings=None) -> bool:
+    """Expire an old delivery cycle and make the Mini App package locked again.
+
+    When the latest delivered copy is older than auto_delete_minutes:
+      - old delivered rows become delivered=FALSE
+      - AdsGram/Monetag completion rows for that package are cleared
+      - unfinished ad sessions are cleared
+    The package itself remains published, so the user can watch ads and unlock again.
+    """
+    settings = settings or await get_settings()
+    mins = max(1, int(settings.get("auto_delete_minutes") or 20))
+    latest = await db_fetchone(
+        "SELECT created_at FROM video_requests WHERE user_id=%s AND video_code=%s "
+        "AND delivered=TRUE ORDER BY created_at DESC LIMIT 1",
+        (int(user_id), str(video_code)),
+    )
+    if not latest or not latest.get("created_at"):
+        return False
+    if latest["created_at"] > utcnow_sql() - timedelta(minutes=mins):
+        return False
+
+    pub = await db_fetchone("SELECT id FROM videos WHERE video_code=%s LIMIT 1", (str(video_code),))
+    await db_execute(
+        "UPDATE video_requests SET delivered=FALSE WHERE user_id=%s AND video_code=%s AND delivered=TRUE",
+        (int(user_id), str(video_code)),
+    )
+    if pub:
+        await db_execute(
+            "DELETE FROM ad_completions WHERE user_id=%s AND video_id=%s",
+            (int(user_id), pub["id"]),
+        )
+        await db_execute(
+            "DELETE FROM ad_sessions WHERE user_id=%s AND video_id=%s",
+            (int(user_id), pub["id"]),
+        )
+        await db_execute(
+            "INSERT INTO user_video_events(user_id,video_id,video_code,event_type,created_at) "
+            "VALUES(%s,%s,%s,'access_expired_relocked',%s)",
+            (int(user_id), pub["id"], str(video_code), utcnow_sql()),
+        )
+    return True
+
+
+async def reset_all_expired_access_for_user(user_id: int, settings=None):
+    """Relock every package whose latest delivered copy has expired."""
+    settings = settings or await get_settings()
+    mins = max(1, int(settings.get("auto_delete_minutes") or 20))
+    cutoff = utcnow_sql() - timedelta(minutes=mins)
+    rows = await db_fetchall(
+        """SELECT video_code, MAX(created_at) AS last_delivered
+           FROM video_requests
+           WHERE user_id=%s AND delivered=TRUE
+           GROUP BY video_code
+           HAVING MAX(created_at) <= %s""",
+        (int(user_id), cutoff),
+    )
+    for row in rows:
+        await reset_expired_video_access(int(user_id), row["video_code"], settings)
+
+
 async def deliver_video(message: Message, code: str):
     settings = await get_settings()
     if settings.get("maintenance_mode") and not is_admin_id(message.from_user.id):
@@ -368,11 +429,18 @@ async def deliver_video(message: Message, code: str):
         await message.answer("❌ এই ভিডিওটি পাওয়া যায়নি বা সরানো হয়েছে।")
         return
     try:
-        prev = await db_fetchone("SELECT created_at FROM video_requests WHERE user_id=%s AND video_code=%s AND delivered=TRUE ORDER BY created_at DESC LIMIT 1", (message.from_user.id, code))
-        mins = int(settings.get("auto_delete_minutes") or 20)
-        if prev and prev.get("created_at") and prev["created_at"] <= utcnow_sql() - timedelta(minutes=max(1, mins)):
-            cfg = await v20_video_buttons()
-            await message.answer(cfg.get("deleted_message") or "ভিডিওটি ডিলিট হয়ে গেছে ❌\n\nআবার দেখতে চাইলে আমাদের সাথে থাকুন\nভাইরাল ভিডিও ❤️", reply_markup=v20_button_keyboard(cfg, True))
+        if await reset_expired_video_access(message.from_user.id, code, settings):
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="🔒 আবার Ad দেখে ভিডিও আনলক করুন",
+                    url=f"https://t.me/{MINI_BOT_USERNAME}?start=home"
+                )
+            ]])
+            await message.answer(
+                "🔒 আগের ভিডিও Access-এর সময় শেষ হয়েছে।\n\nMini Bot-এ ভিডিওটি আবার Lock করা হয়েছে। "
+                "আবার দেখতে নিচের বাটনে গিয়ে Ad সম্পন্ন করে Unlock করুন।",
+                reply_markup=kb
+            )
             return
     except Exception:
         log.exception("V20 expired-video check failed")
@@ -430,11 +498,20 @@ async def deliver_video_from_video_bot(message: Message, code: str):
         await message.answer("❌ এই ভিডিওটি পাওয়া যায়নি বা সরানো হয়েছে।")
         return
     try:
-        prev = await db_fetchone("SELECT created_at FROM video_requests WHERE user_id=%s AND video_code=%s AND delivered=TRUE ORDER BY created_at DESC LIMIT 1", (message.from_user.id, code))
-        mins = int(settings.get("auto_delete_minutes") or 20)
-        if prev and prev.get("created_at") and prev["created_at"] <= utcnow_sql() - timedelta(minutes=max(1, mins)):
-            cfg = await v20_video_buttons()
-            await video_bot.send_message(message.chat.id, cfg.get("deleted_message") or "ভিডিওটি ডিলিট হয়ে গেছে ❌\n\nআবার দেখতে চাইলে আমাদের সাথে থাকুন\nভাইরাল ভিডিও ❤️", reply_markup=v20_button_keyboard(cfg, True), protect_content=True)
+        if await reset_expired_video_access(message.from_user.id, code, settings):
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="🔒 আবার Ad দেখে ভিডিও আনলক করুন",
+                    url=f"https://t.me/{MINI_BOT_USERNAME}?start=home"
+                )
+            ]])
+            await video_bot.send_message(
+                message.chat.id,
+                "🔒 আগের ভিডিও Access-এর সময় শেষ হয়েছে।\n\nMini Bot-এ ভিডিওটি আবার Lock করা হয়েছে। "
+                "আবার দেখতে নিচের বাটনে গিয়ে Ad সম্পন্ন করে Unlock করুন।",
+                reply_markup=kb,
+                protect_content=True
+            )
             return
     except Exception:
         log.exception("V20 video-bot expired-video check failed")
@@ -1168,6 +1245,8 @@ async def api_bootstrap(request):
     my_reactions = []
     if u:
         uid=int(u["id"])
+        # V21.0: after Telegram auto-delete time expires, make the package locked again.
+        await reset_all_expired_access_for_user(uid, settings)
         rows = await db_fetchall("""SELECT DISTINCT v.id FROM video_requests r JOIN videos v ON v.video_code=r.video_code
                                   WHERE r.user_id=%s AND r.delivered=TRUE""", (uid,))
         unlocked = [r["id"] for r in rows]
@@ -1363,6 +1442,7 @@ async def api_unlock_url(request):
     row = await db_fetchone("SELECT video_code,short_url,required_ads,delivery_mode FROM videos WHERE id=%s AND published=TRUE", (vid,))
     if not row:
         raise web.HTTPNotFound(text="Package not found")
+    await reset_expired_video_access(int(u["id"]), row.get("video_code"), settings)
     mode = str(settings.get("monetization_mode") or "both").lower()
     ads_req = int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
     mon_req = int(settings.get("monetag_required_default") or 1)
@@ -1394,8 +1474,9 @@ async def api_ad_status(request):
     u=request_user(request)
     if not u: raise web.HTTPUnauthorized(text="Telegram authorization required")
     vid=request.match_info["video_id"]; settings=await get_settings()
-    row=await db_fetchone("SELECT required_ads FROM videos WHERE id=%s AND published=TRUE",(vid,))
+    row=await db_fetchone("SELECT required_ads,video_code FROM videos WHERE id=%s AND published=TRUE",(vid,))
     if not row: raise web.HTTPNotFound(text="Package not found")
+    await reset_expired_video_access(int(u["id"]), row.get("video_code"), settings)
     mode=str(settings.get("monetization_mode") or "both").lower()
     ads_req=int(row.get("required_ads") if row.get("required_ads") is not None else (settings.get("required_ads_default") or 1))
     mon_req=int(settings.get("monetag_required_default") or 1)
