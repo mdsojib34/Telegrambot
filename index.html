@@ -1622,7 +1622,7 @@ async function loadAutoDrafts(){
   c.innerHTML='<div class="empty-state" style="padding:18px 8px">Loading...</div>';
   try{
     const d=await apiFetch('/api/admin/drafts'); autoDraftCache=d.drafts||[];
-    c.innerHTML=autoDraftCache.length?autoDraftCache.map((x,i)=>`<div class="draft-card">${x.thumb?`<img class="draft-thumb" src="${x.thumb}">`:`<div class="draft-thumb" style="display:grid;place-items:center">🎬</div>`}<div class="draft-meta"><b>${escapeHtml(x.title||x.video_code)}</b><small>${escapeHtml(x.video_code)}${x.caption_text?' · caption ready':''}${x.uploader_label?' · '+escapeHtml(x.uploader_label):''}</small><button class="btn btn-g draft-use" onclick="useAutoDraftByIndex(${i})">✨ Auto Draft ব্যবহার করুন</button></div></div>`).join(''):'<div class="empty-state" style="padding:18px 8px">নতুন pending draft নেই</div>';
+    c.innerHTML=autoDraftCache.length?autoDraftCache.map((x,i)=>`<div class="draft-card">${x.thumb?`<img class="draft-thumb" src="${x.thumb}">`:`<div class="draft-thumb" style="display:grid;place-items:center">🎬</div>`}<div class="draft-meta"><b>${escapeHtml(x.title||x.video_code)}</b><small>${escapeHtml(x.video_code)}${x.caption_text?' · caption ready':''}${x.uploader_label?' · '+escapeHtml(x.uploader_label):''}</small><div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px"><button class="btn btn-g draft-use" style="flex:1;margin:0" onclick="useAutoDraftByIndex(${i})">✨ Auto Draft ব্যবহার করুন</button><button class="btn btn-danger" style="width:auto;margin:0;padding:8px 12px" onclick="deleteAutoDraftByIndex(${i})">🗑️ Delete</button></div></div></div>`).join(''):'<div class="empty-state" style="padding:18px 8px">নতুন pending draft নেই</div>';
   }catch(e){c.innerHTML='<div class="empty-state" style="padding:18px 8px">Draft load হয়নি</div>';showToast('Auto Draft load হয়নি','danger');}
 }
 function useAutoDraftByIndex(i){
@@ -1634,6 +1634,18 @@ function useAutoDraftByIndex(i){
   const dm=document.getElementById('av-delivery-mode'); if(dm)dm.value='video_bot';
   showToast('Auto Thumbnail Draft বসানো হয়েছে ✅','success');
   document.getElementById('av-title')?.focus();
+}
+
+async function deleteAutoDraftByIndex(i){
+  const x=autoDraftCache[i]; if(!x)return;
+  if(!confirm(`ভিডিও Draft "${x.title||x.video_code}" ডিলিট করবেন?`))return;
+  try{
+    await apiFetch('/api/admin/drafts/'+encodeURIComponent(x.video_code),{method:'DELETE'});
+    showToast('ভিডিও Draft ডিলিট হয়েছে ✅','success');
+    await loadAutoDrafts();
+  }catch(e){
+    showToast('Draft delete হয়নি — bot.py-তে Draft DELETE API প্রয়োজন','danger');
+  }
 }
 
 
