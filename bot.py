@@ -475,25 +475,54 @@ async def deliver_video_from_video_bot(message: Message, code: str):
         await message.answer("❌ ভিডিও পাঠানো যায়নি। Video Bot-কে Storage Channel-এর Admin করুন।")
 
 
-async def send_start_video(bot_instance, message, settings, bot_label="start"):
-    """Attach the configured Start Video before the bot's existing welcome text/buttons.
+async def send_start_video(bot_instance, message, settings, bot_label="start", reply_markup=None, fallback_caption=None):
+    """Send Start Video as ONE Telegram message: video + text/caption + button.
 
-    Used by Mini Bot and Notification Bot only. Video Bot is intentionally excluded.
-    The video has no replacement caption/buttons: the existing welcome message is sent
-    immediately afterwards by the normal /start handler.
+    Mini Bot and Notification Bot use this helper. Video Bot is excluded.
+    Returns True only when the configured video was successfully sent.
     """
     try:
         cfg = await db_fetchone("SELECT * FROM tutorial_settings WHERE id='main'") or {}
-        if not cfg.get("enabled", True) or not cfg.get("video_code"):
+        if not cfg.get("enabled", True):
             return False
-        rec = await lookup_video(str(cfg.get("video_code")))
+        code = str(cfg.get("video_code") or "").strip()
+        if not code:
+            return False
+        rec = await lookup_video(code)
         if not rec:
-            log.warning("%s start video mapping missing: %s", bot_label, cfg.get("video_code"))
+            log.warning("%s start video mapping missing: %s", bot_label, code)
             return False
+
+        title = str(cfg.get("title") or "").strip()
+        description = str(cfg.get("description") or "").strip()
+        configured_caption = "\n\n".join(x for x in (title, description) if x).strip()
+        caption = configured_caption or str(fallback_caption or "").strip() or "🎬 ভিডিও দেখার নিয়ম"
+
+        # Keep the existing bot CTA, but allow the Start Video panel's button label
+        # to rename that same button without changing its destination.
+        button_text = str(cfg.get("button_text") or "").strip()[:64]
+        kb = reply_markup
+        if kb and button_text:
+            try:
+                rows = []
+                for row in kb.inline_keyboard:
+                    new_row = []
+                    for b in row:
+                        data = b.model_dump(exclude_none=True)
+                        data["text"] = button_text
+                        new_row.append(InlineKeyboardButton(**data))
+                    rows.append(new_row)
+                kb = InlineKeyboardMarkup(inline_keyboard=rows)
+            except Exception:
+                log.exception("%s start video button-label build failed", bot_label)
+                kb = reply_markup
+
         await bot_instance.copy_message(
             chat_id=message.chat.id,
             from_chat_id=int(rec["channel_id"]),
             message_id=int(rec["message_id"]),
+            caption=caption,
+            reply_markup=kb,
             protect_content=True,
         )
         return True
@@ -517,9 +546,12 @@ async def mini_bot_start_handler(message: Message):
     elif payload.startswith("welcome"):
         welcome = settings.get("join_welcome_text") or welcome
     kb = await mini_webapp_keyboard(settings)
-    # V20.7: Mini Bot normal /start = Start Video + existing Welcome Text + existing Buttons.
+    # V20.8: Mini Bot /start sends ONE message: Tutorial Video + text/caption + existing Home button.
+    # If no Start Video is configured (or delivery fails), fall back to the old welcome text + button.
     if not payload:
-        await send_start_video(mini_bot, message, settings, "mini")
+        sent = await send_start_video(mini_bot, message, settings, "mini", reply_markup=kb, fallback_caption=welcome)
+        if sent:
+            return
     await message.answer(welcome, reply_markup=kb)
 
 
@@ -603,13 +635,16 @@ async def start_handler(message: Message):
 
     # V20.7: Notification Bot normal /start = Start Video + existing Welcome Text + existing Buttons.
     # Video Bot remains unchanged and never receives this Start Video.
-    if not payload:
-        await send_start_video(bot, message, settings, "notification")
     welcome = settings.get("welcome_text") or (
         f"👋 স্বাগতম {settings.get('brand_name','Bangladesh Viral Video')} Bot-এ।\n\n"
         "নিচের বাটন থেকে Mini App খুলুন এবং আপনার পছন্দের ভিডিও দেখুন।"
     )
-    await message.answer(welcome, reply_markup=await webapp_keyboard(settings))
+    kb = await webapp_keyboard(settings)
+    if not payload:
+        sent = await send_start_video(bot, message, settings, "notification", reply_markup=kb, fallback_caption=welcome)
+        if sent:
+            return
+    await message.answer(welcome, reply_markup=kb)
 
 
 @dp.message(F.chat.type == "private")
