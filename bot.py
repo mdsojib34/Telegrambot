@@ -1154,10 +1154,22 @@ async def broadcast_worker():
             )
             for v in videos:
                 button_text = settings.get("broadcast_button_text") or "▶ ভিডিও ওপেন করুন"
-                target_url = v.get("share_link") or (f"https://t.me/{MINI_BOT_USERNAME}?startapp={v.get('share_code')}" if v.get('share_code') else None)
-                if not target_url:
+
+                # V21.3 package notification URL routing:
+                # Mini Bot keeps the original package-specific dynamic link.
+                # Video Bot + Notification Bot + selected Channels use a fixed Mini Bot start link.
+                mini_package_url = v.get("share_link") or (
+                    f"https://t.me/{MINI_BOT_USERNAME}?startapp={v.get('share_code')}"
+                    if v.get('share_code') else None
+                )
+                other_package_url = "https://t.me/Bangladesh_vairal_videobot?start=start"
+
+                if not mini_package_url:
                     continue
-                kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=button_text, url=target_url)]])
+
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text=button_text, url=mini_package_url)
+                ]])
                 # Three-bot routing:
                 #   Mini Bot         -> TEXT ONLY (no thumbnail)
                 #   Video Bot        -> THUMBNAIL + editable caption/button
@@ -1169,21 +1181,28 @@ async def broadcast_worker():
                 package_name = v.get('title') or 'New Video'
                 ok = fail = 0
 
-                def package_keyboard(text_key, fallback):
+                def package_keyboard(text_key, fallback, url):
                     label = (settings.get(text_key) or fallback).strip()[:64]
-                    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=label, url=target_url)]])
+                    return InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(text=label, url=url)
+                    ]])
 
                 async def send_text_only(client, uid, msg_key, btn_key):
                     text = _render_template(settings.get(msg_key), package_name=package_name, total_video=total_video)
                     if not text.strip():
                         text = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
-                    await client.send_message(uid, text, reply_markup=package_keyboard(btn_key, "🎬 ভিডিও দেখুন"), protect_content=True)
+                    await client.send_message(
+                        uid,
+                        text,
+                        reply_markup=package_keyboard(btn_key, "🎬 ভিডিও দেখুন", mini_package_url),
+                        protect_content=True
+                    )
 
                 async def send_with_thumbnail(client, uid, msg_key, btn_key):
                     text = _render_template(settings.get(msg_key), package_name=package_name, total_video=total_video)
                     if not text.strip():
                         text = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
-                    kb2 = package_keyboard(btn_key, "🎬 ভিডিও দেখুন")
+                    kb2 = package_keyboard(btn_key, "🎬 ভিডিও দেখুন", other_package_url)
                     thumb = v.get("thumb") or ""
                     if thumb.startswith("http://") or thumb.startswith("https://"):
                         await client.send_photo(uid, photo=thumb, caption=text, reply_markup=kb2, protect_content=True)
@@ -1234,7 +1253,9 @@ async def broadcast_worker():
                     if not ch_caption.strip():
                         ch_caption = f"🔥 New Video Package\n\n📦 Package Name: {package_name}\n🎬 Total Video: {total_video}"
                     ch_btn = (settings.get("channel_package_button_text") or "ভিডিও দেখুন").strip()[:64]
-                    ch_kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=ch_btn, url=target_url)]])
+                    ch_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(text=ch_btn, url=other_package_url)
+                    ]])
                     thumb = v.get("thumb") or ""
                     for ch in channels:
                         chat_id = int(ch["chat_id"])
